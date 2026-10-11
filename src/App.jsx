@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import Jugadores from './pages/Jugadores'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
@@ -26,13 +27,23 @@ function App() {
         element={estaAutenticado ? <Navigate to="/" replace /> : <Login />}
       />
 
-      {/* Rutas protegidas con Layout */}
       <Route
         path="/"
         element={
           <ProtectedRoute>
             <Layout>
               <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/jugadores"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <Jugadores />
             </Layout>
           </ProtectedRoute>
         }
