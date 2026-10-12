@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Search, Plus, Filter, Eye, Edit } from 'lucide-react'
+import { Search, Plus, Filter, Eye, Edit, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import JugadorFormDrawer from '../components/JugadorFormDrawer'
 import JugadorDetalleDrawer from '../components/JugadorDetalleDrawer'
 
 export default function Jugadores() {
+  const navigate = useNavigate()
   const [jugadores, setJugadores] = useState([])
   const [equipos, setEquipos] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -87,7 +89,9 @@ export default function Jugadores() {
     setCargando(false)
   }
 
-  useEffect(() => {
+    useEffect(() => {
+      // Cargar jugadores al montar el componente
+     // eslint-disable-next-line react-hooks/set-state-in-effect
     recargar()
   }, [])
 
@@ -201,13 +205,22 @@ export default function Jugadores() {
           </p>
         </div>
 
-        <button
-          onClick={abrirDrawerNuevo}
-          className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 flex items-center gap-2 transition-colors"
-        >
-          <Plus size={18} />
-          Agregar Jugador
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/jugadores/importar')}
+            className="bg-liga-amarillo text-liga-azul px-4 py-2 rounded-md font-semibold hover:bg-liga-amarillo/90 flex items-center gap-2 transition-colors"
+          >
+            <Upload size={18} />
+            Importar Excel
+          </button>
+          <button
+            onClick={abrirDrawerNuevo}
+            className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 flex items-center gap-2 transition-colors"
+          >
+            <Plus size={18} />
+            Agregar Jugador
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}

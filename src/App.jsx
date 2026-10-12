@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Jugadores from './pages/Jugadores'
+import ImportarJugadores from './pages/ImportarJugadores'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
@@ -44,6 +45,17 @@ function App() {
           <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
             <Layout>
               <Jugadores />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/jugadores/importar"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <ImportarJugadores />
             </Layout>
           </ProtectedRoute>
         }
