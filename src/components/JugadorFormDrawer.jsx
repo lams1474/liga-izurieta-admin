@@ -168,6 +168,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
     try {
       if (jugadorEditar) {
         // EDITAR jugador existente
+        // 1. Actualizar datos del jugador
         const { error: errJugador } = await supabase
           .from('jugadores')
           .update({
@@ -186,7 +187,81 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
         if (errJugador) throw errJugador
 
-        toast.success('Jugador actualizado')
+        // 2. Verificar si cambió de equipo (solo si es admin/secretaria)
+        if (esAdmin) {
+          // Inscripción activa actual
+          const inscripcionActual = jugadorEditar.inscripciones?.find((i) => i.activo)
+          const equipoActualId = inscripcionActual?.equipo?.id
+          const equipoNuevoId = form.equipo_id
+
+          if (equipoNuevoId && equipoNuevoId !== equipoActualId) {
+            const hoy = new Date().toISOString().split('T')[0]
+
+            // 2.1. Cerrar inscripción actual
+            if (inscripcionActual) {
+              await supabase
+                .from('jugador_equipo')
+                .update({ activo: false })
+                .eq('id', inscripcionActual.id)
+
+              await supabase
+                .from('historial_clubes_jugador')
+                .update({ fecha_hasta: hoy })
+                .eq('jugador_id', jugadorEditar.id)
+                .eq('equipo_id', equipoActualId)
+                .is('fecha_hasta', null)
+            }
+
+            // 2.2. Crear nueva inscripción
+            const { error: errInsc } = await supabase
+              .from('jugador_equipo')
+              .insert({
+                jugador_id: jugadorEditar.id,
+                equipo_id: equipoNuevoId,
+                dorsal: form.dorsal ? parseInt(form.dorsal) : null,
+                posicion: form.posicion.trim() || null,
+                activo: true,
+              })
+
+            if (errInsc) throw errInsc
+
+            // 2.3. Registrar en historial
+            const { data: equipoData } = await supabase
+              .from('equipos')
+              .select('disciplina, categoria')
+              .eq('id', equipoNuevoId)
+              .single()
+
+            if (equipoData) {
+              await supabase.from('historial_clubes_jugador').insert({
+                jugador_id: jugadorEditar.id,
+                equipo_id: equipoNuevoId,
+                disciplina: equipoData.disciplina,
+                categoria: equipoData.categoria,
+                temporada: '2026-2027',
+                fecha_desde: hoy,
+                tipo_movimiento: form.tipo_pase === 'nuevo' ? 'nuevo' : 'pase_entrada',
+                registrado_por: usuario.id,
+              })
+            }
+
+            toast.success('Jugador actualizado y transferido a nuevo equipo')
+          } else {
+            // No cambió de equipo, solo actualizar dorsal/posición
+            if (inscripcionActual) {
+              await supabase
+                .from('jugador_equipo')
+                .update({
+                  dorsal: form.dorsal ? parseInt(form.dorsal) : null,
+                  posicion: form.posicion.trim() || null,
+                })
+                .eq('id', inscripcionActual.id)
+            }
+            toast.success('Jugador actualizado')
+          }
+        } else {
+          toast.success('Jugador actualizado')
+        }
       } else {
         // CREAR jugador nuevo
         // Determinar equipo_id
