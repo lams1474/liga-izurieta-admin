@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { Search, Plus, Filter, Eye, Edit } from 'lucide-react'
 import toast from 'react-hot-toast'
 import JugadorFormDrawer from '../components/JugadorFormDrawer'
+import JugadorDetalleDrawer from '../components/JugadorDetalleDrawer'
 
 export default function Jugadores() {
   const [jugadores, setJugadores] = useState([])
@@ -14,10 +15,15 @@ export default function Jugadores() {
   const [filtroEquipo, setFiltroEquipo] = useState('')
   const [filtroDisciplina, setFiltroDisciplina] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('activos')
 
-  // Estado del drawer
+  // Estado del drawer de formulario
   const [drawerAbierto, setDrawerAbierto] = useState(false)
   const [jugadorEditando, setJugadorEditando] = useState(null)
+
+  // Estado del drawer de detalle
+  const [detalleAbierto, setDetalleAbierto] = useState(false)
+  const [jugadorDetalle, setJugadorDetalle] = useState(null)
 
   // Cargar equipos al inicio
   useEffect(() => {
@@ -55,7 +61,7 @@ export default function Jugadores() {
         calificado,
         activo,
         creado_en,
-        inscripciones:jugador_equipo!inner (
+        inscripciones:jugador_equipo (
           id,
           dorsal,
           activo,
@@ -68,7 +74,6 @@ export default function Jugadores() {
         )
       `)
       .eq('activo', true)
-      .eq('jugador_equipo.activo', true)
       .order('apellidos')
 
     if (error) {
@@ -88,6 +93,12 @@ export default function Jugadores() {
 
   // Filtrar en el cliente
   const jugadoresFiltrados = jugadores.filter((j) => {
+    // Filtro por estado
+    const tieneInscripcionActiva = j.inscripciones?.some((i) => i.activo)
+
+    if (filtroEstado === 'activos' && !tieneInscripcionActiva) return false
+    if (filtroEstado === 'sin_equipo' && tieneInscripcionActiva) return false
+
     // Búsqueda por nombre/cédula
     if (busqueda) {
       const texto = busqueda.toLowerCase()
@@ -125,6 +136,7 @@ export default function Jugadores() {
     setFiltroEquipo('')
     setFiltroDisciplina('')
     setFiltroCategoria('')
+    setFiltroEstado('activos')
   }
 
   function abrirDrawerNuevo() {
@@ -140,6 +152,40 @@ export default function Jugadores() {
   function cerrarDrawer() {
     setDrawerAbierto(false)
     setJugadorEditando(null)
+  }
+
+  function abrirDetalle(jugador) {
+    setJugadorDetalle(jugador.id)
+    setDetalleAbierto(true)
+  }
+
+  function cerrarDetalle() {
+    setDetalleAbierto(false)
+    setJugadorDetalle(null)
+  }
+
+  async function editarDesdeDetalle(jugadorId) {
+    // Cargar datos frescos desde Supabase
+    const { data, error } = await supabase
+      .from('jugadores')
+      .select(`
+        *,
+        inscripciones:jugador_equipo (
+          id, dorsal, posicion, activo,
+          equipo:equipos!jugador_equipo_equipo_id_fkey (id, nombre, disciplina, categoria)
+        )
+      `)
+      .eq('id', jugadorId)
+      .single()
+
+    if (error || !data) {
+      toast.error('No se pudo cargar el jugador')
+      return
+    }
+
+    cerrarDetalle()
+    setJugadorEditando(data)
+    setDrawerAbierto(true)
   }
 
   return (
@@ -231,10 +277,21 @@ export default function Jugadores() {
               </option>
             ))}
           </select>
+
+          {/* Estado */}
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-liga-azul md:col-span-4"
+          >
+            <option value="activos">Solo activos en un club</option>
+            <option value="sin_equipo">Sin equipo (dados de baja)</option>
+            <option value="todos">Todos los jugadores</option>
+          </select>
         </div>
 
         {/* Botón limpiar */}
-        {(busqueda || filtroEquipo || filtroDisciplina || filtroCategoria) && (
+        {(busqueda || filtroEquipo || filtroDisciplina || filtroCategoria || filtroEstado !== 'activos') && (
           <button
             onClick={limpiarFiltros}
             className="mt-3 text-sm text-liga-rojo hover:underline"
@@ -295,8 +352,9 @@ export default function Jugadores() {
               </thead>
               <tbody>
                 {jugadoresFiltrados.map((j) => {
-                  const primeraInscripcion = j.inscripciones?.[0]
-                  const equipo = primeraInscripcion?.equipo
+                  // Buscar la primera inscripción ACTIVA
+                  const inscripcionActiva = j.inscripciones?.find((i) => i.activo)
+                  const equipo = inscripcionActiva?.equipo
 
                   return (
                     <tr
@@ -330,7 +388,9 @@ export default function Jugadores() {
                             </div>
                           </div>
                         ) : (
-                          <span className="text-gray-400">Sin equipo</span>
+                          <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full font-semibold">
+                            Sin equipo activo
+                          </span>
                         )}
                       </td>
                       <td className="px-3 py-3 text-center">
@@ -358,7 +418,7 @@ export default function Jugadores() {
                       <td className="px-3 py-3 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => toast.info('Próximamente')}
+                            onClick={() => abrirDetalle(j)}
                             className="p-2 text-liga-azul hover:bg-blue-50 rounded-md transition-colors"
                             title="Ver detalle"
                           >
@@ -382,12 +442,21 @@ export default function Jugadores() {
         </div>
       )}
 
-      {/* Drawer de agregar/editar (FUERA del .map, al final del componente) */}
+      {/* Drawer de agregar/editar */}
       <JugadorFormDrawer
         abierto={drawerAbierto}
         onCerrar={cerrarDrawer}
         jugadorEditar={jugadorEditando}
         onGuardado={recargar}
+      />
+
+      {/* Drawer de detalle */}
+      <JugadorDetalleDrawer
+        abierto={detalleAbierto}
+        onCerrar={cerrarDetalle}
+        jugadorId={jugadorDetalle}
+        onEditar={editarDesdeDetalle}
+        onCambio={recargar}
       />
     </div>
   )
