@@ -268,7 +268,7 @@ export default function Usuarios() {
       )}
 
       {/* Tarjetas de resumen por rol */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 sm:gap-3 mb-6">
         {Object.entries(ROLES_CONFIG).slice(0, 6).map(([key, config]) => (
           <button
             key={key}

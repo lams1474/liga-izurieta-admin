@@ -64,6 +64,7 @@ export default function Sidebar({ usuario }) {
 
   // Cerrar menú móvil al cambiar de ruta
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMenuMovilAbierto(false)
   }, [location.pathname])
 
