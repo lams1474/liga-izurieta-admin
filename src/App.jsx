@@ -3,6 +3,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Jugadores from './pages/Jugadores'
 import ImportarJugadores from './pages/ImportarJugadores'
+import Usuarios from './pages/Usuarios'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
@@ -56,6 +57,17 @@ function App() {
           <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
             <Layout>
               <ImportarJugadores />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/usuarios"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin']}>
+            <Layout>
+              <Usuarios />
             </Layout>
           </ProtectedRoute>
         }
