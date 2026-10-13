@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Search, Plus, Filter, Eye, Edit, UserCog, Shield, KeyRound, Users as UsersIcon } from 'lucide-react'
+import { Search, Plus, Filter, Eye, Edit, Calendar, Timer } from 'lucide-react'
 import toast from 'react-hot-toast'
+import UsuarioFormDrawer from '../components/UsuarioFormDrawer'
+import PeriodoInscripcionDrawer from '../components/PeriodoInscripcionDrawer'
 
 // Configuración visual por rol
 const ROLES_CONFIG = {
@@ -44,13 +46,23 @@ const ROLES_CONFIG = {
 
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([])
-  const [equipos, setEquipos] = useState([])
   const [cargando, setCargando] = useState(true)
 
   // Filtros
   const [busqueda, setBusqueda] = useState('')
   const [filtroRol, setFiltroRol] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('activos')
+
+  // Estado del drawer de formulario
+  const [drawerAbierto, setDrawerAbierto] = useState(false)
+  const [usuarioEditando, setUsuarioEditando] = useState(null)
+
+  // Estado del drawer de período
+  const [drawerPeriodoAbierto, setDrawerPeriodoAbierto] = useState(false)
+  const [periodoActivo, setPeriodoActivo] = useState(null)
+
+  // Reloj que se actualiza cada minuto
+  const [ahora, setAhora] = useState(new Date())
 
   // Cargar usuarios
   async function recargar() {
@@ -83,30 +95,57 @@ export default function Usuarios() {
     setCargando(false)
   }
 
-  // Cargar equipos
-  useEffect(() => {
-    async function cargarEquipos() {
-      const { data } = await supabase
-        .from('equipos')
-        .select('id, nombre, disciplina, categoria')
-        .eq('activo', true)
-        .order('nombre')
-      setEquipos(data || [])
+  // Cargar período activo
+  async function cargarPeriodo() {
+    const { data, error } = await supabase
+      .from('periodos_inscripcion')
+      .select('*')
+      .eq('activo', true)
+      .gte('fecha_fin', new Date().toISOString())
+      .order('fecha_fin', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error cargando período:', error)
+      setPeriodoActivo(null)
+    } else {
+      setPeriodoActivo(data || null)
     }
-    cargarEquipos()
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     recargar()
+    cargarPeriodo()
   }, [])
+
+  // Actualizar el reloj cada minuto (para cuenta regresiva)
+  useEffect(() => {
+    const interval = setInterval(() => setAhora(new Date()), 60000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Calcular tiempo restante
+  const tiempoRestante = (() => {
+    if (!periodoActivo) return null
+    const fin = new Date(periodoActivo.fecha_fin)
+    const diff = fin - ahora
+    if (diff <= 0) return null
+
+    const dias = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const horas = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    const minutos = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+
+    return { dias, horas, minutos }
+  })()
 
   // Filtrar en el cliente
   const usuariosFiltrados = usuarios.filter((u) => {
-    // Filtro por estado
     if (filtroEstado === 'activos' && !u.activo) return false
     if (filtroEstado === 'inactivos' && u.activo) return false
-
-    // Filtro por rol
     if (filtroRol && u.rol !== filtroRol) return false
 
-    // Búsqueda por nombre/email
     if (busqueda) {
       const texto = busqueda.toLowerCase()
       const nombreCompleto = `${u.apellidos} ${u.nombres}`.toLowerCase()
@@ -128,12 +167,42 @@ export default function Usuarios() {
     capitan: usuarios.filter((u) => u.rol === 'capitan').length,
   }
 
+  // Funciones de UI
+  function abrirDrawerNuevo() {
+    setUsuarioEditando(null)
+    setDrawerAbierto(true)
+  }
+
+  function abrirDrawerEditar(usuario) {
+    setUsuarioEditando(usuario)
+    setDrawerAbierto(true)
+  }
+
+  function cerrarDrawer() {
+    setDrawerAbierto(false)
+    setUsuarioEditando(null)
+  }
+
+  function abrirDrawerPeriodo() {
+    setDrawerPeriodoAbierto(true)
+  }
+
+  function cerrarDrawerPeriodo() {
+    setDrawerPeriodoAbierto(false)
+  }
+
+  async function recargarDespuesPeriodo() {
+    await cargarPeriodo()
+  }
+
   return (
     <div className="max-w-7xl">
       {/* Encabezado */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-liga-azul">Usuarios del Sistema</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-liga-azul">
+            Usuarios del Sistema
+          </h1>
           <p className="text-gray-500 text-sm mt-1">
             {cargando
               ? 'Cargando...'
@@ -141,28 +210,78 @@ export default function Usuarios() {
           </p>
         </div>
 
-        <button
-          onClick={() => toast.info('Próximamente: formulario de crear usuario')}
-          className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 flex items-center gap-2 transition-colors"
-        >
-          <Plus size={18} />
-          Agregar Usuario
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button
+            onClick={abrirDrawerPeriodo}
+            className={`px-4 py-2 rounded-md font-semibold flex items-center justify-center gap-2 transition-colors w-full sm:w-auto ${
+              periodoActivo
+                ? 'bg-liga-amarillo text-liga-azul hover:bg-liga-amarillo/90'
+                : 'bg-liga-rojo text-white hover:bg-liga-rojo/90'
+            }`}
+          >
+            <Calendar size={18} />
+            {periodoActivo ? 'Ver Período' : 'Activar Período'}
+          </button>
+          <button
+            onClick={abrirDrawerNuevo}
+            className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
+          >
+            <Plus size={18} />
+            Agregar Usuario
+          </button>
+        </div>
       </div>
 
+      {/* Tarjeta de período activo */}
+      {periodoActivo && tiempoRestante && (
+        <div className="bg-gradient-to-r from-liga-amarillo/30 to-liga-amarillo/10 border-2 border-liga-amarillo rounded-lg shadow-md p-4 mb-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-liga-amarillo text-liga-azul p-2 rounded-full">
+                <Timer size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-liga-azul">
+                  Período de Inscripción Activo
+                </h3>
+                <p className="text-sm text-gray-700">{periodoActivo.nombre}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-600">Termina en</p>
+              <p className="font-bold text-lg text-liga-azul">
+                {tiempoRestante.dias > 0 && `${tiempoRestante.dias}d `}
+                {tiempoRestante.horas > 0 && `${tiempoRestante.horas}h `}
+                {tiempoRestante.minutos}m
+              </p>
+              <p className="text-xs text-gray-500">
+                {new Date(periodoActivo.fecha_fin).toLocaleDateString('es-EC', {
+                  day: 'numeric',
+                  month: 'long',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tarjetas de resumen por rol */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3 mb-6">
         {Object.entries(ROLES_CONFIG).slice(0, 6).map(([key, config]) => (
           <button
             key={key}
             onClick={() => setFiltroRol(filtroRol === key ? '' : key)}
-            className={`bg-white rounded-lg shadow-md p-3 text-center hover:shadow-lg transition-all border-2 ${
+            className={`bg-white rounded-lg shadow-md p-2 sm:p-3 text-center hover:shadow-lg transition-all border-2 ${
               filtroRol === key ? 'border-liga-azul' : 'border-transparent'
             }`}
           >
-            <div className="text-2xl">{config.emoji}</div>
-            <div className="text-xs text-gray-600 mt-1">{config.label}</div>
-            <div className="text-xl font-bold text-liga-azul mt-1">
+            <div className="text-xl sm:text-2xl">{config.emoji}</div>
+            <div className="text-[10px] sm:text-xs text-gray-600 mt-1 leading-tight">
+              {config.label}
+            </div>
+            <div className="text-base sm:text-xl font-bold text-liga-azul mt-1">
               {contadores[key] || 0}
             </div>
           </button>
@@ -176,8 +295,7 @@ export default function Usuarios() {
           <span className="font-semibold">Filtros</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Buscador */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           <div className="relative">
             <Search
               size={18}
@@ -192,7 +310,6 @@ export default function Usuarios() {
             />
           </div>
 
-          {/* Rol */}
           <select
             value={filtroRol}
             onChange={(e) => setFiltroRol(e.target.value)}
@@ -207,7 +324,6 @@ export default function Usuarios() {
             <option value="capitan">Capitán</option>
           </select>
 
-          {/* Estado */}
           <select
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value)}
@@ -288,8 +404,8 @@ export default function Usuarios() {
                       key={u.id}
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
-                      <td className="px-3 py-3">
-                        <div className="font-semibold text-gray-800">
+                      <td className="px-2 sm:px-3 py-2 sm:py-3">
+                        <div className="font-semibold text-gray-800 text-sm">
                           {u.apellidos} {u.nombres}
                         </div>
                         {u.telefono && (
@@ -298,7 +414,7 @@ export default function Usuarios() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-600">
+                      <td className="px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm text-gray-600">
                         {u.email}
                       </td>
                       <td className="px-3 py-3 text-center">
@@ -344,7 +460,7 @@ export default function Usuarios() {
                             <Eye size={16} />
                           </button>
                           <button
-                            onClick={() => toast.info('Próximamente: editar usuario')}
+                            onClick={() => abrirDrawerEditar(u)}
                             className="p-2 text-liga-azul hover:bg-blue-50 rounded-md transition-colors"
                             title="Editar"
                           >
@@ -360,6 +476,22 @@ export default function Usuarios() {
           </div>
         </div>
       )}
+
+      {/* Drawer de formulario de usuario */}
+      <UsuarioFormDrawer
+        abierto={drawerAbierto}
+        onCerrar={cerrarDrawer}
+        usuarioEditar={usuarioEditando}
+        onGuardado={recargar}
+      />
+
+      {/* Drawer de período de inscripción */}
+      <PeriodoInscripcionDrawer
+        abierto={drawerPeriodoAbierto}
+        onCerrar={cerrarDrawerPeriodo}
+        periodoActual={periodoActivo}
+        onGuardado={recargarDespuesPeriodo}
+      />
     </div>
   )
 }
