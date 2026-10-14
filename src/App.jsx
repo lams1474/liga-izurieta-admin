@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Jugadores from './pages/Jugadores'
 import ImportarJugadores from './pages/ImportarJugadores'
 import Usuarios from './pages/Usuarios'
+import MisJugadores from './pages/MisJugadores'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
@@ -40,6 +41,7 @@ function App() {
         }
       />
 
+      {/* Rutas del admin/secretaría */}
       <Route
         path="/jugadores"
         element={
@@ -68,6 +70,18 @@ function App() {
           <ProtectedRoute rolesPermitidos={['admin']}>
             <Layout>
               <Usuarios />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Rutas del presidente */}
+      <Route
+        path="/mis-jugadores"
+        element={
+          <ProtectedRoute rolesPermitidos={['delegado']}>
+            <Layout>
+              <MisJugadores />
             </Layout>
           </ProtectedRoute>
         }
