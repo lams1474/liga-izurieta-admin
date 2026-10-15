@@ -3,8 +3,9 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   X, User, Edit, DollarSign, UserMinus, AlertTriangle,
   FileText, Shield, Award, Clock,
-  CheckCircle, XCircle
+  CheckCircle, XCircle, QrCode, Printer
 } from 'lucide-react'
+import CarnetDigitalCard from './CarnetDigitalCard'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -28,6 +29,7 @@ export default function JugadorDetalleDrawer({
   const [deudas, setDeudas] = useState([])
   const [modalPago, setModalPago] = useState(false)
   const [modalBaja, setModalBaja] = useState(false)
+  const [modalCarnet, setModalCarnet] = useState(false)
   const [montoPago, setMontoPago] = useState('1.00')
   const [guardando, setGuardando] = useState(false)
 
@@ -507,6 +509,14 @@ export default function JugadorDetalleDrawer({
                 Acciones
               </h4>
               <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setModalCarnet(true)}
+                  className="bg-liga-amarillo text-liga-azul px-4 py-2 rounded-md text-sm font-semibold hover:bg-liga-amarillo/90 flex items-center gap-2"
+                >
+                  <QrCode size={16} />
+                  Ver Carnet Oficial
+                </button>
+
                 {esAdmin && (
                   <button
                     onClick={() => {
@@ -574,6 +584,44 @@ export default function JugadorDetalleDrawer({
                   className="flex-1 bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 disabled:opacity-50"
                 >
                   {guardando ? 'Guardando...' : 'Confirmar pago'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* MODAL: Carnet Digital Oficial */}
+      {modalCarnet && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalCarnet(false)} />
+          <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="text-lg font-bold text-liga-azul flex items-center gap-2">
+                  <QrCode size={20} /> Carnet Digital Oficial
+                </h3>
+                <button onClick={() => setModalCarnet(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="py-2">
+                <CarnetDigitalCard jugador={jugador} equipo={inscripciones[0]?.equipo} />
+              </div>
+
+              <div className="flex justify-between items-center border-t pt-4">
+                <button
+                  onClick={() => window.print()}
+                  className="bg-liga-azul text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-liga-azul/90 flex items-center gap-2"
+                >
+                  <Printer size={16} /> Imprimir Carnet
+                </button>
+                <button
+                  onClick={() => setModalCarnet(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cerrar
                 </button>
               </div>
             </div>
