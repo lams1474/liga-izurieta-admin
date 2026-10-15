@@ -3,8 +3,9 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   X, User, Edit, DollarSign, UserMinus, AlertTriangle,
   FileText, Shield, Award, Clock,
-  CheckCircle, XCircle
+  CheckCircle, XCircle, QrCode, Printer, CheckSquare, XSquare, Power
 } from 'lucide-react'
+import CarnetDigitalCard from './CarnetDigitalCard'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -28,6 +29,7 @@ export default function JugadorDetalleDrawer({
   const [deudas, setDeudas] = useState([])
   const [modalPago, setModalPago] = useState(false)
   const [modalBaja, setModalBaja] = useState(false)
+  const [modalCarnet, setModalCarnet] = useState(false)
   const [montoPago, setMontoPago] = useState('1.00')
   const [guardando, setGuardando] = useState(false)
 
@@ -155,6 +157,69 @@ export default function JugadorDetalleDrawer({
     } catch (err) {
       console.error(err)
       toast.error('Error al registrar pago')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function cambiarEstadoPase(nuevoEstado) {
+    setGuardando(true)
+    try {
+      const { error } = await supabase
+        .from('jugadores')
+        .update({ estado_pase: nuevoEstado })
+        .eq('id', jugadorId)
+
+      if (error) throw error
+
+      toast.success(`Pase ${nuevoEstado === 'aprobado' ? 'aprobado' : 'rechazado'}`)
+      await cargarTodo()
+      onCambio?.()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al actualizar pase')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function cambiarCalificacion(cal) {
+    setGuardando(true)
+    try {
+      const { error } = await supabase
+        .from('jugadores')
+        .update({ calificado: cal })
+        .eq('id', jugadorId)
+
+      if (error) throw error
+
+      toast.success(cal ? 'Jugador calificado correctamente' : 'Calificación desmarcada')
+      await cargarTodo()
+      onCambio?.()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al calificar jugador')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function cambiarEstadoActivo(act) {
+    setGuardando(true)
+    try {
+      const { error } = await supabase
+        .from('jugadores')
+        .update({ activo: act })
+        .eq('id', jugadorId)
+
+      if (error) throw error
+
+      toast.success(act ? 'Jugador activado en el sistema' : 'Jugador inactivado en el sistema')
+      await cargarTodo()
+      onCambio?.()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al cambiar estado activo')
     } finally {
       setGuardando(false)
     }
@@ -345,20 +410,20 @@ export default function JugadorDetalleDrawer({
               )}
             </section>
 
-            {/* PASE */}
+            {/* PASE Y CALIFICACIÓN */}
             <section className="bg-white rounded-lg shadow-md p-5">
               <h4 className="text-sm font-bold text-liga-azul uppercase mb-3 pb-2 border-b flex items-center gap-2">
-                <FileText size={16} /> Pase Deportivo
+                <FileText size={16} /> Pase Deportivo y Calificación
               </h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                 <div>
-                  <p className="text-gray-500 text-xs">Tipo</p>
+                  <p className="text-gray-500 text-xs">Tipo de Pase</p>
                   <p className="font-semibold capitalize">
                     {jugador.tipo_pase?.replace('_', ' ') || 'Nuevo'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500 text-xs">Estado</p>
+                  <p className="text-gray-500 text-xs">Estado del Pase</p>
                   <p className={`font-semibold ${
                     jugador.estado_pase === 'aprobado' ? 'text-green-600' : 'text-yellow-600'
                   }`}>
@@ -372,6 +437,59 @@ export default function JugadorDetalleDrawer({
                   </div>
                 )}
               </div>
+
+              {/* Botones para Administrador y Secretaría */}
+              {esAdmin && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                  {jugador.estado_pase !== 'aprobado' ? (
+                    <button
+                      onClick={() => cambiarEstadoPase('aprobado')}
+                      disabled={guardando}
+                      className="bg-green-600 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-green-700 flex items-center gap-1.5"
+                    >
+                      <CheckCircle size={14} /> Aprobar Pase
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => cambiarEstadoPase('pendiente')}
+                      disabled={guardando}
+                      className="bg-yellow-500 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1.5"
+                    >
+                      <XCircle size={14} /> Desmarcar Pase
+                    </button>
+                  )}
+
+                  {!jugador.calificado ? (
+                    <button
+                      onClick={() => cambiarCalificacion(true)}
+                      disabled={guardando}
+                      className="bg-liga-azul text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-liga-azul/90 flex items-center gap-1.5"
+                    >
+                      <CheckSquare size={14} /> Calificar Jugador
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => cambiarCalificacion(false)}
+                      disabled={guardando}
+                      className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-gray-300 flex items-center gap-1.5"
+                    >
+                      <XSquare size={14} /> Quitar Calificación
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => cambiarEstadoActivo(!jugador.activo)}
+                    disabled={guardando}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 ${
+                      jugador.activo
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                    }`}
+                  >
+                    <Power size={14} /> {jugador.activo ? 'Inactivar' : 'Activar'}
+                  </button>
+                </div>
+              )}
             </section>
 
             {/* SANCIONES */}
@@ -507,6 +625,14 @@ export default function JugadorDetalleDrawer({
                 Acciones
               </h4>
               <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setModalCarnet(true)}
+                  className="bg-liga-amarillo text-liga-azul px-4 py-2 rounded-md text-sm font-semibold hover:bg-liga-amarillo/90 flex items-center gap-2"
+                >
+                  <QrCode size={16} />
+                  Ver Carnet Oficial
+                </button>
+
                 {esAdmin && (
                   <button
                     onClick={() => {
@@ -574,6 +700,44 @@ export default function JugadorDetalleDrawer({
                   className="flex-1 bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 disabled:opacity-50"
                 >
                   {guardando ? 'Guardando...' : 'Confirmar pago'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* MODAL: Carnet Digital Oficial */}
+      {modalCarnet && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalCarnet(false)} />
+          <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="text-lg font-bold text-liga-azul flex items-center gap-2">
+                  <QrCode size={20} /> Carnet Digital Oficial
+                </h3>
+                <button onClick={() => setModalCarnet(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="py-2">
+                <CarnetDigitalCard jugador={jugador} equipo={inscripciones[0]?.equipo} />
+              </div>
+
+              <div className="flex justify-between items-center border-t pt-4">
+                <button
+                  onClick={() => window.print()}
+                  className="bg-liga-azul text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-liga-azul/90 flex items-center gap-2"
+                >
+                  <Printer size={16} /> Imprimir Carnet
+                </button>
+                <button
+                  onClick={() => setModalCarnet(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cerrar
                 </button>
               </div>
             </div>

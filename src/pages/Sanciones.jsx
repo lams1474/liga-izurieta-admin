@@ -1,14 +1,25 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useCallback } from 'react'
-import { AlertTriangle, ShieldAlert, CheckCircle, Search, Filter, RefreshCw } from 'lucide-react'
+import { AlertTriangle, ShieldAlert, CheckCircle, Search, Filter, RefreshCw, Plus, X, Save } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Sanciones() {
   const [cargando, setCargando] = useState(true)
   const [sanciones, setSanciones] = useState([])
+  const [jugadoresList, setJugadoresList] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('activas') // 'activas' | 'todas'
+
+  // Modal para Nueva Sanción
+  const [modalAbierto, setModalAbierto] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [formSancion, setFormSancion] = useState({
+    jugador_id: '',
+    tipo: 'roja',
+    motivo: '',
+    fechas_sancion: 1,
+  })
 
   const cargarSanciones = useCallback(async () => {
     setCargando(true)
@@ -38,9 +49,54 @@ export default function Sanciones() {
     }
   }, [filtroEstado])
 
+  const cargarJugadores = useCallback(async () => {
+    const { data } = await supabase
+      .from('jugadores')
+      .select('id, nombres, apellidos, cedula')
+      .eq('activo', true)
+      .order('apellidos')
+    setJugadoresList(data || [])
+  }, [])
+
   useEffect(() => {
     cargarSanciones()
-  }, [cargarSanciones])
+    cargarJugadores()
+  }, [cargarSanciones, cargarJugadores])
+
+  async function registrarSancion() {
+    if (!formSancion.jugador_id) {
+      toast.error('Selecciona un jugador')
+      return
+    }
+    if (!formSancion.motivo.trim()) {
+      toast.error('Escribe el motivo de la sanción')
+      return
+    }
+
+    setGuardando(true)
+    try {
+      const { error } = await supabase.from('sanciones_jugador').insert({
+        jugador_id: formSancion.jugador_id,
+        tipo: formSancion.tipo,
+        motivo: formSancion.motivo.trim(),
+        fechas_sancion: parseInt(formSancion.fechas_sancion) || 1,
+        fechas_cumplidas: 0,
+        activa: true,
+      })
+
+      if (error) throw error
+
+      toast.success('Sanción registrada correctamente')
+      setModalAbierto(false)
+      setFormSancion({ jugador_id: '', tipo: 'roja', motivo: '', fechas_sancion: 1 })
+      cargarSanciones()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al registrar sanción: ' + err.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
 
   const sancionesFiltradas = sanciones.filter((s) => {
     if (!busqueda) return true
@@ -65,6 +121,13 @@ export default function Sanciones() {
             Control de tarjetas amarillas, rojas, suspensiones y cumplimiento de fechas
           </p>
         </div>
+
+        <button
+          onClick={() => setModalAbierto(true)}
+          className="bg-liga-rojo text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-liga-rojo/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
+        >
+          <Plus size={18} /> Registrar Sanción
+        </button>
       </div>
 
       {/* Tarjetas resumen */}
@@ -186,6 +249,105 @@ export default function Sanciones() {
           </div>
         )}
       </div>
+
+      {/* MODAL: Registrar Sanción */}
+      {modalAbierto && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalAbierto(false)} />
+          <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="text-lg font-bold text-liga-rojo flex items-center gap-2">
+                  <AlertTriangle size={20} /> Registrar Nueva Sanción
+                </h3>
+                <button onClick={() => setModalAbierto(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Seleccionar Jugador <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formSancion.jugador_id}
+                    onChange={(e) => setFormSancion({ ...formSancion, jugador_id: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                  >
+                    <option value="">Seleccionar jugador...</option>
+                    {jugadoresList.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.apellidos} {j.nombres} ({j.cedula})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Tipo de Sanción <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formSancion.tipo}
+                    onChange={(e) => setFormSancion({ ...formSancion, tipo: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                  >
+                    <option value="roja">Roja Directa (2 fechas)</option>
+                    <option value="doble_amarilla">Doble Amarilla (1 fecha)</option>
+                    <option value="amarilla">Acumulación de Amarillas</option>
+                    <option value="suspension_admin">Suspensión Administrativa</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Número de Fechas de Suspensión
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={formSancion.fechas_sancion}
+                    onChange={(e) => setFormSancion({ ...formSancion, fechas_sancion: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Motivo / Observaciones <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formSancion.motivo}
+                    onChange={(e) => setFormSancion({ ...formSancion, motivo: e.target.value })}
+                    placeholder="Ej. Conducta antideportiva en el minuto 35"
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 border-t pt-4">
+                <button
+                  onClick={() => setModalAbierto(false)}
+                  disabled={guardando}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={registrarSancion}
+                  disabled={guardando}
+                  className="flex-1 bg-liga-rojo text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-liga-rojo/90 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <Save size={16} /> {guardando ? 'Guardando...' : 'Registrar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
