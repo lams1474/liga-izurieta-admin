@@ -539,7 +539,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
                 Formatos: JPG, PNG · Máximo 5 MB · Se comprime automáticamente
               </p>
 
-              {/* Inputs ocultos */}
+              {/* Input para seleccionar archivo */}
               <input
                 ref={inputArchivoRef}
                 type="file"
@@ -547,11 +547,14 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
                 onChange={handleFotoSeleccionada}
                 className="hidden"
               />
+
+              {/* Input para tomar foto (mejor compatibilidad) */}
+              
               <input
                 ref={inputCamaraRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
+                capture="user"
                 onChange={handleFotoSeleccionada}
                 className="hidden"
               />
