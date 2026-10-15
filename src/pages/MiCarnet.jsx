@@ -187,6 +187,18 @@ export default function MiCarnet() {
       ) : pestaña === 'carnet' ? (
         <div className="space-y-6">
           {/* Alertas sobre estado del carnet */}
+          {jugador && !jugador.consentimiento_firmado && (
+            <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-800 rounded-r-xl text-sm flex items-start gap-3">
+              <AlertCircle size={20} className="flex-shrink-0 text-red-600 mt-0.5" />
+              <div>
+                <p className="font-bold">Consentimiento de Datos Pendiente</p>
+                <p className="text-xs text-red-700 mt-0.5">
+                  No has firmado el consentimiento de uso de datos personales. Acércate a la dirigencia o solicita a tu delegado autorizar el consentimiento.
+                </p>
+              </div>
+            </div>
+          )}
+
           {jugador && !jugador.carnet_pagado && (
             <div className="p-4 bg-amber-50 border-l-4 border-amber-500 text-amber-800 rounded-r-xl text-sm flex items-start gap-3">
               <AlertCircle size={20} className="flex-shrink-0 text-amber-600 mt-0.5" />
@@ -229,6 +241,7 @@ export default function MiCarnet() {
             validacion={{
               esHabilitado: Boolean(
                 jugador?.carnet_pagado &&
+                jugador?.consentimiento_firmado !== false &&
                 !sancionActiva &&
                 deudasPendientes.length === 0 &&
                 jugador?.estado_pase === 'aprobado'

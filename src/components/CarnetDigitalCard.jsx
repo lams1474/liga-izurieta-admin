@@ -5,8 +5,8 @@ export default function CarnetDigitalCard({ jugador, equipo, validacion }) {
 
   const esHabilitado = validacion?.esHabilitado ?? (
     jugador.carnet_pagado &&
+    jugador.consentimiento_firmado !== false &&
     !jugador.es_menor_sin_tutor &&
-    jugador.foto_actualizada &&
     jugador.estado_pase === 'aprobado'
   )
 
