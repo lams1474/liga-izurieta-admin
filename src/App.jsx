@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Jugadores from './pages/Jugadores'
 import ImportarJugadores from './pages/ImportarJugadores'
 import Usuarios from './pages/Usuarios'
+import Equipos from './pages/Equipos'
 import MisJugadores from './pages/MisJugadores'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -36,6 +37,17 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/equipos"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <Equipos />
             </Layout>
           </ProtectedRoute>
         }
