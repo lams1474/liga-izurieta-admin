@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   X, User, Edit, DollarSign, UserMinus, AlertTriangle,
   FileText, Shield, Award, Clock,
-  CheckCircle, XCircle, QrCode, Printer
+  CheckCircle, XCircle, QrCode, Printer, CheckSquare, XSquare, Power
 } from 'lucide-react'
 import CarnetDigitalCard from './CarnetDigitalCard'
 import { supabase } from '../lib/supabase'
@@ -157,6 +157,69 @@ export default function JugadorDetalleDrawer({
     } catch (err) {
       console.error(err)
       toast.error('Error al registrar pago')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function cambiarEstadoPase(nuevoEstado) {
+    setGuardando(true)
+    try {
+      const { error } = await supabase
+        .from('jugadores')
+        .update({ estado_pase: nuevoEstado })
+        .eq('id', jugadorId)
+
+      if (error) throw error
+
+      toast.success(`Pase ${nuevoEstado === 'aprobado' ? 'aprobado' : 'rechazado'}`)
+      await cargarTodo()
+      onCambio?.()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al actualizar pase')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function cambiarCalificacion(cal) {
+    setGuardando(true)
+    try {
+      const { error } = await supabase
+        .from('jugadores')
+        .update({ calificado: cal })
+        .eq('id', jugadorId)
+
+      if (error) throw error
+
+      toast.success(cal ? 'Jugador calificado correctamente' : 'Calificación desmarcada')
+      await cargarTodo()
+      onCambio?.()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al calificar jugador')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function cambiarEstadoActivo(act) {
+    setGuardando(true)
+    try {
+      const { error } = await supabase
+        .from('jugadores')
+        .update({ activo: act })
+        .eq('id', jugadorId)
+
+      if (error) throw error
+
+      toast.success(act ? 'Jugador activado en el sistema' : 'Jugador inactivado en el sistema')
+      await cargarTodo()
+      onCambio?.()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al cambiar estado activo')
     } finally {
       setGuardando(false)
     }
@@ -347,20 +410,20 @@ export default function JugadorDetalleDrawer({
               )}
             </section>
 
-            {/* PASE */}
+            {/* PASE Y CALIFICACIÓN */}
             <section className="bg-white rounded-lg shadow-md p-5">
               <h4 className="text-sm font-bold text-liga-azul uppercase mb-3 pb-2 border-b flex items-center gap-2">
-                <FileText size={16} /> Pase Deportivo
+                <FileText size={16} /> Pase Deportivo y Calificación
               </h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                 <div>
-                  <p className="text-gray-500 text-xs">Tipo</p>
+                  <p className="text-gray-500 text-xs">Tipo de Pase</p>
                   <p className="font-semibold capitalize">
                     {jugador.tipo_pase?.replace('_', ' ') || 'Nuevo'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500 text-xs">Estado</p>
+                  <p className="text-gray-500 text-xs">Estado del Pase</p>
                   <p className={`font-semibold ${
                     jugador.estado_pase === 'aprobado' ? 'text-green-600' : 'text-yellow-600'
                   }`}>
@@ -374,6 +437,59 @@ export default function JugadorDetalleDrawer({
                   </div>
                 )}
               </div>
+
+              {/* Botones para Administrador y Secretaría */}
+              {esAdmin && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                  {jugador.estado_pase !== 'aprobado' ? (
+                    <button
+                      onClick={() => cambiarEstadoPase('aprobado')}
+                      disabled={guardando}
+                      className="bg-green-600 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-green-700 flex items-center gap-1.5"
+                    >
+                      <CheckCircle size={14} /> Aprobar Pase
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => cambiarEstadoPase('pendiente')}
+                      disabled={guardando}
+                      className="bg-yellow-500 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-yellow-600 flex items-center gap-1.5"
+                    >
+                      <XCircle size={14} /> Desmarcar Pase
+                    </button>
+                  )}
+
+                  {!jugador.calificado ? (
+                    <button
+                      onClick={() => cambiarCalificacion(true)}
+                      disabled={guardando}
+                      className="bg-liga-azul text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-liga-azul/90 flex items-center gap-1.5"
+                    >
+                      <CheckSquare size={14} /> Calificar Jugador
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => cambiarCalificacion(false)}
+                      disabled={guardando}
+                      className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-gray-300 flex items-center gap-1.5"
+                    >
+                      <XSquare size={14} /> Quitar Calificación
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => cambiarEstadoActivo(!jugador.activo)}
+                    disabled={guardando}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 ${
+                      jugador.activo
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                    }`}
+                  >
+                    <Power size={14} /> {jugador.activo ? 'Inactivar' : 'Activar'}
+                  </button>
+                </div>
+              )}
             </section>
 
             {/* SANCIONES */}
