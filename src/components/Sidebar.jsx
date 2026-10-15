@@ -37,8 +37,15 @@ const menusPorRol = {
     { path: '/mis-pases', label: 'Mis Pases', icon: BookUser },
     { path: '/mi-nomina', label: 'Mi Nómina', icon: FileText },
   ],
+  jugador: [
+    { path: '/', label: 'Inicio', icon: Home },
+    { path: '/mi-carnet', label: 'Mi Carnet Digital', icon: QrCode },
+    { path: '/calendario', label: 'Mi Próximo Partido', icon: Calendar },
+    { path: '/sanciones', label: 'Mis Sanciones', icon: AlertTriangle },
+  ],
   capitan: [
     { path: '/', label: 'Inicio', icon: Home },
+    { path: '/mi-carnet', label: 'Mi Carnet Digital', icon: QrCode },
     { path: '/cerrar-acta', label: 'Cerrar Acta', icon: PenTool },
   ],
   vocal: [
