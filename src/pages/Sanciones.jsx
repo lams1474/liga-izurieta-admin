@@ -91,7 +91,7 @@ export default function Sanciones() {
         return
       }
 
-      // 1. Insertar sanción
+      // Insertar sanción (La base de datos se encarga de generar la multa correspondiente en deudas_jugador)
       const { error } = await supabase
         .from('sanciones_jugador')
         .insert({
@@ -106,23 +106,7 @@ export default function Sanciones() {
 
       if (error) throw error
 
-      // 2. Si se especificó monto de multa, registrar en deudas_jugador
-      const multa = parseFloat(formSancion.monto_multa) || 0
-      if (multa > 0) {
-        const { error: errDeuda } = await supabase.from('deudas_jugador').insert({
-          jugador_id: formSancion.jugador_id,
-          equipo_id: equipoId,
-          concepto: `Multa por sanción (${formSancion.tipo.replace('_', ' ')}) - ${formSancion.motivo.trim()}`,
-          monto: multa,
-          monto_pagado: 0,
-          fecha_emision: new Date().toISOString().split('T')[0],
-        })
-        if (errDeuda) {
-          console.error('Error al generar deuda de multa:', errDeuda)
-        }
-      }
-
-      toast.success('Sanción y multa registrada correctamente')
+      toast.success('Sanción registrada correctamente')
       setModalAbierto(false)
       setFormSancion({ jugador_id: '', tipo: 'roja', motivo: '', fechas_sancion: 1, monto_multa: 5.0 })
       cargarSanciones()

@@ -68,7 +68,10 @@ export default function Pagos() {
       // 3. Cargar lista de jugadores para el selector de pagos
       const { data: listJ } = await supabase
         .from('jugadores')
-        .select('id, nombres, apellidos, cedula, carnet_pagado')
+        .select(`
+          id, nombres, apellidos, cedula, carnet_pagado,
+          inscripciones:jugador_equipo(equipo_id, activo)
+        `)
         .order('apellidos')
       setJugadoresList(listJ || [])
 
@@ -220,10 +223,16 @@ export default function Pagos() {
         payload.equipo_id = formNuevaDeuda.equipo_id
       } else {
         payload.jugador_id = formNuevaDeuda.jugador_id
-        // Asignar el equipo si el jugador pertenece a uno
         const jSel = jugadoresList.find((j) => j.id === formNuevaDeuda.jugador_id)
-        if (jSel?.inscripciones?.[0]?.equipo_id) {
-          payload.equipo_id = jSel.inscripciones[0].equipo_id
+        const inscActiva = jSel?.inscripciones?.find((i) => i.activo) || jSel?.inscripciones?.[0]
+
+        // Asignar el equipo si el jugador pertenece a uno, o de formNuevaDeuda.equipo_id, o del primer equipo de la liga
+        payload.equipo_id = formNuevaDeuda.equipo_id || inscActiva?.equipo_id || equiposList[0]?.id
+
+        if (!payload.equipo_id) {
+          toast.error('No se encontró un equipo asociado. Por favor selecciona un equipo.')
+          setGuardandoNuevaDeuda(false)
+          return
         }
       }
 
