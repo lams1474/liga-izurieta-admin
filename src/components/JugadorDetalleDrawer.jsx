@@ -232,8 +232,16 @@ export default function JugadorDetalleDrawer({
             {/* FOTO + NOMBRE */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
-                  <User size={40} className="text-gray-400" />
+                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden border-2 border-liga-azul/20 flex-shrink-0">
+                  {jugador.foto_url ? (
+                    <img
+                      src={jugador.foto_url}
+                      alt={`${jugador.nombres} ${jugador.apellidos}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User size={40} className="text-gray-400" />
+                  )}
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-gray-800">
