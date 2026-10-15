@@ -19,6 +19,7 @@ export default function Sanciones() {
     tipo: 'roja',
     motivo: '',
     fechas_sancion: 1,
+    monto_multa: 5.0,
   })
 
   const cargarSanciones = useCallback(async () => {
@@ -29,6 +30,7 @@ export default function Sanciones() {
         .select(`
           id, tipo, motivo, fechas_sancion, fechas_cumplidas, fecha_inicio, activa,
           jugador:jugadores (id, nombres, apellidos, cedula),
+          equipo_id,
           equipo:equipos (nombre)
         `)
         .order('creado_en', { ascending: false })
@@ -52,7 +54,10 @@ export default function Sanciones() {
   const cargarJugadores = useCallback(async () => {
     const { data } = await supabase
       .from('jugadores')
-      .select('id, nombres, apellidos, cedula')
+      .select(`
+        id, nombres, apellidos, cedula,
+        inscripciones:jugador_equipo(equipo_id, activo)
+      `)
       .eq('activo', true)
       .order('apellidos')
     setJugadoresList(data || [])
@@ -75,20 +80,51 @@ export default function Sanciones() {
 
     setGuardando(true)
     try {
-      const { error } = await supabase.from('sanciones_jugador').insert({
-        jugador_id: formSancion.jugador_id,
-        tipo: formSancion.tipo,
-        motivo: formSancion.motivo.trim(),
-        fechas_sancion: parseInt(formSancion.fechas_sancion) || 1,
-        fechas_cumplidas: 0,
-        activa: true,
-      })
+      // Buscar equipo_id del jugador desde sus inscripciones activas
+      const jugadorSel = jugadoresList.find((j) => j.id === formSancion.jugador_id)
+      const inscActiva = jugadorSel?.inscripciones?.find((i) => i.activo)
+      const equipoId = inscActiva?.equipo_id
+
+      if (!equipoId) {
+        toast.error('El jugador no tiene un equipo asignado activo.')
+        setGuardando(false)
+        return
+      }
+
+      // 1. Insertar sanción
+      const { error } = await supabase
+        .from('sanciones_jugador')
+        .insert({
+          jugador_id: formSancion.jugador_id,
+          equipo_id: equipoId,
+          tipo: formSancion.tipo,
+          motivo: formSancion.motivo.trim(),
+          fechas_sancion: parseInt(formSancion.fechas_sancion) || 1,
+          fechas_cumplidas: 0,
+          activa: true,
+        })
 
       if (error) throw error
 
-      toast.success('Sanción registrada correctamente')
+      // 2. Si se especificó monto de multa, registrar en deudas_jugador
+      const multa = parseFloat(formSancion.monto_multa) || 0
+      if (multa > 0) {
+        const { error: errDeuda } = await supabase.from('deudas_jugador').insert({
+          jugador_id: formSancion.jugador_id,
+          equipo_id: equipoId,
+          concepto: `Multa por sanción (${formSancion.tipo.replace('_', ' ')}) - ${formSancion.motivo.trim()}`,
+          monto: multa,
+          monto_pagado: 0,
+          fecha_emision: new Date().toISOString().split('T')[0],
+        })
+        if (errDeuda) {
+          console.error('Error al generar deuda de multa:', errDeuda)
+        }
+      }
+
+      toast.success('Sanción y multa registrada correctamente')
       setModalAbierto(false)
-      setFormSancion({ jugador_id: '', tipo: 'roja', motivo: '', fechas_sancion: 1 })
+      setFormSancion({ jugador_id: '', tipo: 'roja', motivo: '', fechas_sancion: 1, monto_multa: 5.0 })
       cargarSanciones()
     } catch (err) {
       console.error(err)
@@ -300,18 +336,34 @@ export default function Sanciones() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Número de Fechas de Suspensión
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={formSancion.fechas_sancion}
-                    onChange={(e) => setFormSancion({ ...formSancion, fechas_sancion: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Fechas Suspensión
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={formSancion.fechas_sancion}
+                      onChange={(e) => setFormSancion({ ...formSancion, fechas_sancion: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Multa Económica ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={formSancion.monto_multa}
+                      onChange={(e) => setFormSancion({ ...formSancion, monto_multa: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                    />
+                  </div>
                 </div>
 
                 <div>
