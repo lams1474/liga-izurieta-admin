@@ -1,10 +1,11 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Shield, Plus, Search, Filter, RefreshCw, CheckCircle2, XCircle
+  Shield, Plus, Search, Filter, RefreshCw, CheckCircle2, XCircle, Edit
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import EquipoFormDrawer from '../components/EquipoFormDrawer'
 
 export default function Equipos() {
   const [cargando, setCargando] = useState(true)
@@ -12,6 +13,10 @@ export default function Equipos() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroDisciplina, setFiltroDisciplina] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
+
+  // Estado del drawer
+  const [drawerAbierto, setDrawerAbierto] = useState(false)
+  const [equipoEditando, setEquipoEditando] = useState(null)
 
   const cargarEquipos = useCallback(async () => {
     setCargando(true)
@@ -49,6 +54,21 @@ export default function Equipos() {
   const totalFutsala = equipos.filter((e) => e.disciplina === 'futsala').length
   const totalFutbol = equipos.filter((e) => e.disciplina === 'futbol').length
 
+  function abrirCrear() {
+    setEquipoEditando(null)
+    setDrawerAbierto(true)
+  }
+
+  function abrirEditar(equipo) {
+    setEquipoEditando(equipo)
+    setDrawerAbierto(true)
+  }
+
+  function cerrarDrawer() {
+    setDrawerAbierto(false)
+    setEquipoEditando(null)
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Encabezado */}
@@ -63,7 +83,7 @@ export default function Equipos() {
           </p>
         </div>
         <button
-          onClick={() => toast.success('Próximamente: Formulario Crear Equipo')}
+          onClick={abrirCrear}
           className="bg-liga-azul text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-liga-azul/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
         >
           <Plus size={18} />
@@ -207,10 +227,10 @@ export default function Equipos() {
                     </td>
                     <td className="px-6 py-4 text-right font-medium">
                       <button
-                        onClick={() => toast.success(`Ver detalle de ${eq.nombre}`)}
-                        className="text-liga-azul hover:underline text-xs"
+                        onClick={() => abrirEditar(eq)}
+                        className="text-liga-azul hover:bg-blue-50 p-2 rounded-md transition-colors flex items-center gap-1 ml-auto text-xs font-semibold"
                       >
-                        Ver detalles
+                        <Edit size={15} /> Editar
                       </button>
                     </td>
                   </tr>
@@ -220,6 +240,14 @@ export default function Equipos() {
           </div>
         )}
       </div>
+
+      {/* Drawer Formulario */}
+      <EquipoFormDrawer
+        abierto={drawerAbierto}
+        onCerrar={cerrarDrawer}
+        equipoEditar={equipoEditando}
+        onGuardado={cargarEquipos}
+      />
     </div>
   )
 }

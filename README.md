@@ -48,17 +48,15 @@ funcionalidades según el rol del usuario.
 | 2 | Header + Sidebar con roles | ✅ Completado |
 | 3 | Módulo Jugadores (CRUD) | ✅ Completado |
 | 4 | Importar Excel masivo | ✅ Completado |
-| 5 | Módulo Usuarios | ⏳ Pendiente |
-| 6 | Módulo Equipos | ⏳ Pendiente |
-| 7 | Módulo Pagos | ⏳ Pendiente |
-| 8 | Módulo Calendario | ⏳ Pendiente |
-| 9 | Módulo Sanciones | ⏳ Pendiente |
-| 10 | Módulo Actas | ⏳ Pendiente |
-| 11 | Módulo Reportes | ⏳ Pendiente |
-| 12 | Módulo Presidente (subir jugadores) | ⏳ Pendiente |
-| 13 | Módulo Vocal | ⏳ Pendiente |
-| 14 | Módulo Árbitro | ⏳ Pendiente |
-| 15 | Deploy en Vercel | ⏳ Pendiente |
+| 5 | Módulo Usuarios | ✅ Completado |
+| 6 | Módulo Equipos (CRUD) | ✅ Completado |
+| 7 | Módulo Pagos | ✅ Completado |
+| 8 | Módulo Calendario | ✅ Completado |
+| 9 | Módulo Sanciones | ✅ Completado |
+| 10 | Módulo Actas | ✅ Completado |
+| 11 | Módulo Reportes | ✅ Completado |
+| 12 | Módulo Presidente (Mis Jugadores) | ✅ Completado |
+| 13 | Deploy en Vercel | ⏳ Listo para producción |
 
 ---
 
