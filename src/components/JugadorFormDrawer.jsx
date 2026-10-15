@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
-import { X, Save, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Save, AlertCircle, Camera, Image as ImageIcon, Trash2, Loader } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { comprimirImagen, validarImagen } from '../lib/imagenUtils'
+import { subirFotoJugador, eliminarFotoJugador, obtenerUrlFoto } from '../lib/fotoUtils'
 import toast from 'react-hot-toast'
 
 export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, onGuardado }) {
@@ -29,6 +31,17 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
   const [errores, setErrores] = useState({})
 
+  // ============ ESTADOS PARA LA FOTO ============
+  const [archivoFoto, setArchivoFoto] = useState(null)
+  const [previewFoto, setPreviewFoto] = useState(null)
+  const [fotoActualUrl, setFotoActualUrl] = useState(null) // foto guardada en BD
+  const [fotoEliminada, setFotoEliminada] = useState(false) // si el usuario eliminó la foto
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
+
+  // Refs para los inputs de archivo
+  const inputArchivoRef = useRef(null)
+  const inputCamaraRef = useRef(null)
+
   // Calcular si es menor de edad
   const esMenor = (() => {
     if (!form.fecha_nacimiento) return false
@@ -36,9 +49,10 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
     const nacimiento = new Date(form.fecha_nacimiento)
     const edad = hoy.getFullYear() - nacimiento.getFullYear()
     const mes = hoy.getMonth() - nacimiento.getMonth()
-    const edadFinal = mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())
-      ? edad - 1
-      : edad
+    const edadFinal =
+      mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())
+        ? edad - 1
+        : edad
     return edadFinal < 18
   })()
 
@@ -46,85 +60,141 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
   useEffect(() => {
     async function cargarEquipos() {
       if (!esAdmin) return
-
       const { data } = await supabase
         .from('equipos')
         .select('id, nombre, disciplina, categoria')
         .eq('activo', true)
         .order('nombre')
-
       setEquipos(data || [])
     }
     cargarEquipos()
   }, [esAdmin])
 
-  // Si hay jugador a editar, cargar sus datos
+  // Cargar datos del jugador si es edición, o resetear si es nuevo
   useEffect(() => {
-    async function cargarJugador() {
-      if (!jugadorEditar) {
-        setForm({
-          nombres: '',
-          apellidos: '',
-          cedula: '',
-          fecha_nacimiento: '',
-          telefono: '',
-          tipo_pase: 'nuevo',
-          club_anterior: '',
-          equipo_id: '',
-          dorsal: '',
-          posicion: '',
-          tutor_nombre: '',
-          tutor_cedula: '',
-          tutor_telefono: '',
-        })
-        setErrores({})
-        return
+    if (!abierto) return
+
+    if (jugadorEditar) {
+      const insc = jugadorEditar.inscripciones?.find((i) => i.activo)
+
+      setForm({
+        nombres: jugadorEditar.nombres || '',
+        apellidos: jugadorEditar.apellidos || '',
+        cedula: jugadorEditar.cedula || '',
+        fecha_nacimiento: jugadorEditar.fecha_nacimiento || '',
+        telefono: jugadorEditar.telefono || '',
+        tipo_pase: jugadorEditar.tipo_pase || 'nuevo',
+        club_anterior: jugadorEditar.club_anterior || '',
+        equipo_id: insc?.equipo?.id || '',
+        dorsal: insc?.dorsal || '',
+        posicion: insc?.posicion || '',
+        tutor_nombre: jugadorEditar.tutor_nombre || '',
+        tutor_cedula: jugadorEditar.tutor_cedula || '',
+        tutor_telefono: jugadorEditar.tutor_telefono || '',
+      })
+
+      // Si tiene foto guardada, mostrarla
+      if (jugadorEditar.foto_url) {
+        setFotoActualUrl(jugadorEditar.foto_url)
+      } else {
+        setFotoActualUrl(null)
       }
-
-      // Cargar datos del jugador
-      const { data: jugador } = await supabase
-        .from('jugadores')
-        .select(`
-          *,
-          inscripciones:jugador_equipo (
-            id, dorsal, posicion, activo,
-            equipo:equipos!jugador_equipo_equipo_id_fkey (id, nombre, disciplina, categoria)
-          )
-        `)
-        .eq('id', jugadorEditar.id)
-        .single()
-
-      if (jugador) {
-        const insc = jugador.inscripciones?.find((i) => i.activo)
-
-        setForm({
-          nombres: jugador.nombres || '',
-          apellidos: jugador.apellidos || '',
-          cedula: jugador.cedula || '',
-          fecha_nacimiento: jugador.fecha_nacimiento || '',
-          telefono: jugador.telefono || '',
-          tipo_pase: jugador.tipo_pase || 'nuevo',
-          club_anterior: jugador.club_anterior || '',
-          equipo_id: insc?.equipo?.id || '',
-          dorsal: insc?.dorsal || '',
-          posicion: insc?.posicion || '',
-          tutor_nombre: jugador.tutor_nombre || '',
-          tutor_cedula: jugador.tutor_cedula || '',
-          tutor_telefono: jugador.tutor_telefono || '',
-        })
-      }
+    } else {
+      setForm({
+        nombres: '',
+        apellidos: '',
+        cedula: '',
+        fecha_nacimiento: '',
+        telefono: '',
+        tipo_pase: 'nuevo',
+        club_anterior: '',
+        equipo_id: '',
+        dorsal: '',
+        posicion: '',
+        tutor_nombre: '',
+        tutor_cedula: '',
+        tutor_telefono: '',
+      })
+      setFotoActualUrl(null)
     }
 
-    if (abierto) cargarJugador()
+    setErrores({})
+    setArchivoFoto(null)
+    setPreviewFoto(null)
+    setFotoEliminada(false)
   }, [jugadorEditar, abierto])
 
-  // Actualizar campo
   function actualizarCampo(campo, valor) {
     setForm((prev) => ({ ...prev, [campo]: valor }))
     setErrores((prev) => ({ ...prev, [campo]: null }))
   }
 
-  // Validar formulario
+  // ============ MANEJO DE FOTO ============
+
+  async function handleFotoSeleccionada(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validar
+    const validacion = validarImagen(file, 5)
+    if (!validacion.valido) {
+      toast.error(validacion.error)
+      e.target.value = '' // limpiar input
+      return
+    }
+
+    // Comprimir
+    setSubiendoFoto(true)
+    toast.loading('Comprimiendo imagen...', { id: 'comprimir' })
+
+    try {
+      const comprimida = await comprimirImagen(file, {
+        maxAncho: 800,
+        maxAlto: 800,
+        calidad: 0.85,
+      })
+
+      const tamanoKB = (comprimida.size / 1024).toFixed(0)
+      toast.success(`Imagen lista (${tamanoKB} KB)`, { id: 'comprimir' })
+
+      // Crear preview
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        setPreviewFoto(ev.target.result)
+      }
+      reader.readAsDataURL(comprimida)
+
+      setArchivoFoto(comprimida)
+      setFotoEliminada(false)
+    } catch (err) {
+      console.error(err)
+      toast.error(err.message || 'Error al procesar la imagen', { id: 'comprimir' })
+    } finally {
+      setSubiendoFoto(false)
+      e.target.value = ''
+    }
+  }
+
+  function eliminarFoto() {
+    setArchivoFoto(null)
+    setPreviewFoto(null)
+    setFotoActualUrl(null)
+    setFotoEliminada(true)
+    toast.success('Foto eliminada. Guarda los cambios para confirmar.')
+  }
+
+  function tomarFoto() {
+    // Abre la cámara trasera del celular
+    inputCamaraRef.current?.click()
+  }
+
+  function seleccionarArchivo() {
+    // Abre el explorador de archivos
+    inputArchivoRef.current?.click()
+  }
+
+  // ============ VALIDACIÓN ============
+
   function validar() {
     const nuevosErrores = {}
 
@@ -156,7 +226,8 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
     return Object.keys(nuevosErrores).length === 0
   }
 
-  // Guardar
+  // ============ GUARDAR ============
+
   async function guardar() {
     if (!validar()) {
       toast.error('Revisa los campos marcados')
@@ -167,7 +238,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
     try {
       if (jugadorEditar) {
-        // EDITAR jugador existente
+        // ============ EDITAR ============
         // 1. Actualizar datos del jugador
         const { error: errJugador } = await supabase
           .from('jugadores')
@@ -187,9 +258,27 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
         if (errJugador) throw errJugador
 
-        // 2. Verificar si cambió de equipo (solo si es admin/secretaria)
+        // 2. Manejar la foto
+        if (archivoFoto) {
+          // Subir nueva foto
+          const url = await subirFotoJugador(archivoFoto, jugadorEditar.id)
+          await supabase
+            .from('jugadores')
+            .update({ foto_url: url, foto_actualizada: true })
+            .eq('id', jugadorEditar.id)
+          toast.success('Foto actualizada')
+        } else if (fotoEliminada) {
+          // Eliminar foto
+          await eliminarFotoJugador(jugadorEditar.id)
+          await supabase
+            .from('jugadores')
+            .update({ foto_url: null, foto_actualizada: false })
+            .eq('id', jugadorEditar.id)
+          toast.success('Foto eliminada')
+        }
+
+        // 3. Verificar cambio de equipo
         if (esAdmin) {
-          // Inscripción activa actual
           const inscripcionActual = jugadorEditar.inscripciones?.find((i) => i.activo)
           const equipoActualId = inscripcionActual?.equipo?.id
           const equipoNuevoId = form.equipo_id
@@ -197,7 +286,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
           if (equipoNuevoId && equipoNuevoId !== equipoActualId) {
             const hoy = new Date().toISOString().split('T')[0]
 
-            // 2.1. Cerrar inscripción actual
             if (inscripcionActual) {
               await supabase
                 .from('jugador_equipo')
@@ -212,7 +300,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
                 .is('fecha_hasta', null)
             }
 
-            // 2.2. Crear nueva inscripción
             const { error: errInsc } = await supabase
               .from('jugador_equipo')
               .insert({
@@ -225,7 +312,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
             if (errInsc) throw errInsc
 
-            // 2.3. Registrar en historial
             const { data: equipoData } = await supabase
               .from('equipos')
               .select('disciplina, categoria')
@@ -245,26 +331,21 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
               })
             }
 
-            toast.success('Jugador actualizado y transferido a nuevo equipo')
-          } else {
-            // No cambió de equipo, solo actualizar dorsal/posición
-            if (inscripcionActual) {
-              await supabase
-                .from('jugador_equipo')
-                .update({
-                  dorsal: form.dorsal ? parseInt(form.dorsal) : null,
-                  posicion: form.posicion.trim() || null,
-                })
-                .eq('id', inscripcionActual.id)
-            }
-            toast.success('Jugador actualizado')
+            toast.success('Jugador transferido a nuevo equipo')
+          } else if (inscripcionActual) {
+            await supabase
+              .from('jugador_equipo')
+              .update({
+                dorsal: form.dorsal ? parseInt(form.dorsal) : null,
+                posicion: form.posicion.trim() || null,
+              })
+              .eq('id', inscripcionActual.id)
           }
-        } else {
-          toast.success('Jugador actualizado')
         }
+
+        toast.success('Jugador actualizado')
       } else {
-        // CREAR jugador nuevo
-        // Determinar equipo_id
+        // ============ CREAR ============
         let equipoFinal = form.equipo_id
         if (esPresidente && usuario.club_id) {
           equipoFinal = usuario.club_id
@@ -276,7 +357,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
           return
         }
 
-        // 1. Insertar jugador
+        // 1. Insertar jugador (sin foto todavía)
         const { data: nuevoJugador, error: errJugador } = await supabase
           .from('jugadores')
           .insert({
@@ -300,7 +381,21 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
         if (errJugador) throw errJugador
 
-        // 2. Inscribir en equipo
+        // 2. Subir foto si existe
+        if (archivoFoto) {
+          try {
+            const url = await subirFotoJugador(archivoFoto, nuevoJugador.id)
+            await supabase
+              .from('jugadores')
+              .update({ foto_url: url, foto_actualizada: true })
+              .eq('id', nuevoJugador.id)
+          } catch (errFoto) {
+            console.error('Error subiendo foto:', errFoto)
+            toast.error('Jugador creado pero hubo un error al subir la foto')
+          }
+        }
+
+        // 3. Inscribir en equipo
         const { error: errInscripcion } = await supabase
           .from('jugador_equipo')
           .insert({
@@ -313,7 +408,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
         if (errInscripcion) throw errInscripcion
 
-        // 3. Registrar en historial
+        // 4. Registrar en historial
         const { data: equipoData } = await supabase
           .from('equipos')
           .select('disciplina, categoria')
@@ -353,6 +448,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
   if (!abierto) return null
 
   const equipoDelPresidente = usuario?.club
+  const fotoMostrar = previewFoto || fotoActualUrl
 
   return (
     <>
@@ -384,6 +480,84 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
         {/* Contenido */}
         <div className="p-6 space-y-6">
+          {/* SECCIÓN: FOTO */}
+          <section>
+            <h3 className="text-sm font-bold text-liga-azul uppercase mb-3 pb-2 border-b">
+              Foto del Jugador
+            </h3>
+
+            <div className="flex flex-col items-center gap-3">
+              {/* Vista previa */}
+              <div className="w-32 h-32 rounded-full border-4 border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center">
+                {fotoMostrar ? (
+                  <img
+                    src={fotoMostrar}
+                    alt="Foto del jugador"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <ImageIcon size={40} className="text-gray-400" />
+                )}
+              </div>
+
+              {/* Botones */}
+              <div className="flex flex-wrap gap-2 justify-center">
+                <button
+                  type="button"
+                  onClick={tomarFoto}
+                  disabled={subiendoFoto}
+                  className="bg-liga-azul text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-liga-azul/90 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {subiendoFoto ? <Loader size={16} className="animate-spin" /> : <Camera size={16} />}
+                  Tomar foto
+                </button>
+
+                <button
+                  type="button"
+                  onClick={seleccionarArchivo}
+                  disabled={subiendoFoto}
+                  className="bg-gray-100 text-gray-700 px-3 py-2 rounded-md text-sm font-semibold hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <ImageIcon size={16} />
+                  Seleccionar
+                </button>
+
+                {fotoMostrar && (
+                  <button
+                    type="button"
+                    onClick={eliminarFoto}
+                    disabled={subiendoFoto}
+                    className="bg-red-100 text-liga-rojo px-3 py-2 rounded-md text-sm font-semibold hover:bg-red-200 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Trash2 size={16} />
+                    Eliminar
+                  </button>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500 text-center">
+                Formatos: JPG, PNG · Máximo 5 MB · Se comprime automáticamente
+              </p>
+
+              {/* Inputs ocultos */}
+              <input
+                ref={inputArchivoRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png"
+                onChange={handleFotoSeleccionada}
+                className="hidden"
+              />
+              <input
+                ref={inputCamaraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFotoSeleccionada}
+                className="hidden"
+              />
+            </div>
+          </section>
+
           {/* SECCIÓN: Datos personales */}
           <section>
             <h3 className="text-sm font-bold text-liga-azul uppercase mb-3 pb-2 border-b">
@@ -482,7 +656,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
               </div>
             </div>
 
-            {/* Alerta si es menor */}
             {esMenor && (
               <div className="mt-3 bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded">
                 <div className="flex items-start gap-2">
@@ -495,7 +668,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
             )}
           </section>
 
-          {/* SECCIÓN: Tutor (solo si es menor) */}
+          {/* SECCIÓN: Tutor */}
           {esMenor && (
             <section>
               <h3 className="text-sm font-bold text-liga-azul uppercase mb-3 pb-2 border-b">
@@ -574,7 +747,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
               Datos Deportivos
             </h3>
 
-            {/* Equipo (solo si es admin/secretaria) */}
             {esAdmin && (
               <div className="mb-3">
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -600,7 +772,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
               </div>
             )}
 
-            {/* Si es presidente, mostrar su club */}
             {esPresidente && equipoDelPresidente && (
               <div className="mb-3">
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -705,14 +876,14 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
         <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex gap-3">
           <button
             onClick={onCerrar}
-            disabled={cargando}
+            disabled={cargando || subiendoFoto}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-md font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={guardar}
-            disabled={cargando}
+            disabled={cargando || subiendoFoto}
             className="flex-1 bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
           >
             {cargando ? (
