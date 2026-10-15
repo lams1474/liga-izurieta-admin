@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useEffect, useState, useCallback } from 'react'
 import {
   X, User, Edit, DollarSign, UserMinus, AlertTriangle,
-  FileText, Phone, Hash, Shield, Award, Clock,
+  FileText, Shield, Award, Clock,
   CheckCircle, XCircle
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -30,13 +31,7 @@ export default function JugadorDetalleDrawer({
   const [montoPago, setMontoPago] = useState('1.00')
   const [guardando, setGuardando] = useState(false)
 
-  useEffect(() => {
-    if (abierto && jugadorId) {
-      cargarTodo()
-    }
-  }, [abierto, jugadorId])
-
-  async function cargarTodo() {
+  const cargarTodo = useCallback(async () => {
     setCargando(true)
 
     try {
@@ -107,7 +102,13 @@ export default function JugadorDetalleDrawer({
     } finally {
       setCargando(false)
     }
-  }
+  }, [jugadorId])
+
+  useEffect(() => {
+    if (abierto && jugadorId) {
+      cargarTodo()
+    }
+  }, [abierto, jugadorId, cargarTodo])
 
   function calcularEdad(fechaNac) {
     if (!fechaNac) return '—'

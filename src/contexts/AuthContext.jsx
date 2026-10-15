@@ -7,33 +7,6 @@ export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null)
   const [cargando, setCargando] = useState(true)
 
-  useEffect(() => {
-    // Verificar sesión inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        cargarUsuario(session.user.id)
-      } else {
-        setCargando(false)
-      }
-    })
-
-    // Escuchar cambios de sesión
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session) {
-          cargarUsuario(session.user.id)
-        } else {
-          setUsuario(null)
-          setCargando(false)
-        }
-      }
-    )
-
-    return () => {
-      listener?.subscription?.unsubscribe()
-    }
-  }, [])
-
   async function cargarUsuario(userId) {
     try {
       const { data, error } = await supabase
@@ -60,6 +33,33 @@ export function AuthProvider({ children }) {
       setCargando(false)
     }
   }
+
+  useEffect(() => {
+    // Verificar sesión inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        cargarUsuario(session.user.id)
+      } else {
+        setCargando(false)
+      }
+    })
+
+    // Escuchar cambios de sesión
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session) {
+          cargarUsuario(session.user.id)
+        } else {
+          setUsuario(null)
+          setCargando(false)
+        }
+      }
+    )
+
+    return () => {
+      listener?.subscription?.unsubscribe()
+    }
+  }, [])
 
   async function login(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -90,6 +90,7 @@ export function AuthProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(AuthContext)
 }

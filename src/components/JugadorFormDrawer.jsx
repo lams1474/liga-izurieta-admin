@@ -1,9 +1,10 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef } from 'react'
 import { X, Save, AlertCircle, Camera, Image as ImageIcon, Trash2, Loader } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { comprimirImagen, validarImagen } from '../lib/imagenUtils'
-import { subirFotoJugador, eliminarFotoJugador, obtenerUrlFoto } from '../lib/fotoUtils'
+import { subirFotoJugador, eliminarFotoJugador } from '../lib/fotoUtils'
 import toast from 'react-hot-toast'
 
 export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, onGuardado }) {
