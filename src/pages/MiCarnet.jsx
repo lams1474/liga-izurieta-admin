@@ -12,6 +12,8 @@ export default function MiCarnet() {
   const [jugador, setJugador] = useState(null)
   const [equipo, setEquipo] = useState(null)
   const [proximoPartido, setProximoPartido] = useState(null)
+  const [sancionActiva, setSancionActiva] = useState(null)
+  const [deudasPendientes, setDeudasPendientes] = useState([])
   const [pestaña, setPestaña] = useState('carnet') // carnet | partido | stats | historial
 
   const cargarDatosJugador = useCallback(async () => {
@@ -39,6 +41,25 @@ export default function MiCarnet() {
 
       if (dataJugador) {
         setJugador(dataJugador)
+
+        // Cargar sanciones activas
+        const { data: sancData } = await supabase
+          .from('sanciones_jugador')
+          .select('*')
+          .eq('jugador_id', dataJugador.id)
+          .eq('activa', true)
+          .maybeSingle()
+        setSancionActiva(sancData)
+
+        // Cargar deudas pendientes
+        const { data: deudasData } = await supabase
+          .from('deudas_jugador')
+          .select('*')
+          .eq('jugador_id', dataJugador.id)
+
+        const pendientes = (deudasData || []).filter((d) => (d.monto || 0) > (d.monto_pagado || 0))
+        setDeudasPendientes(pendientes)
+
         const inscActiva = dataJugador.inscripciones?.find((i) => i.activo)
         if (inscActiva?.equipo) {
           setEquipo(inscActiva.equipo)
@@ -165,7 +186,55 @@ export default function MiCarnet() {
         </div>
       ) : pestaña === 'carnet' ? (
         <div className="space-y-6">
-          <CarnetDigitalCard jugador={jugador} equipo={equipo} />
+          {/* Alertas sobre estado del carnet */}
+          {jugador && !jugador.carnet_pagado && (
+            <div className="p-4 bg-amber-50 border-l-4 border-amber-500 text-amber-800 rounded-r-xl text-sm flex items-start gap-3">
+              <AlertCircle size={20} className="flex-shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                <p className="font-bold">Carnet Digital Pendiente de Pago</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Aún no se ha registrado el pago del carnet para la temporada. Acércate a tesorería para habilitar tu carnet oficial.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {sancionActiva && (
+            <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-800 rounded-r-xl text-sm flex items-start gap-3">
+              <AlertCircle size={20} className="flex-shrink-0 text-red-600 mt-0.5" />
+              <div>
+                <p className="font-bold">Sanción Disciplinaria Activa</p>
+                <p className="text-xs text-red-700 mt-0.5">
+                  Motivo: {sancionActiva.motivo} ({sancionActiva.fechas_cumplidas || 0}/{sancionActiva.fechas_sancion || 1} fechas cumplidas)
+                </p>
+              </div>
+            </div>
+          )}
+
+          {deudasPendientes.length > 0 && (
+            <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-800 rounded-r-xl text-sm flex items-start gap-3">
+              <AlertCircle size={20} className="flex-shrink-0 text-red-600 mt-0.5" />
+              <div>
+                <p className="font-bold">Multa / Deuda Pendiente de Pago</p>
+                <p className="text-xs text-red-700 mt-0.5">
+                  Tienes {deudasPendientes.length} multa(s) pendiente(s) por un total de ${deudasPendientes.reduce((s, d) => s + ((d.monto || 0) - (d.monto_pagado || 0)), 0).toFixed(2)}.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <CarnetDigitalCard
+            jugador={jugador}
+            equipo={equipo}
+            validacion={{
+              esHabilitado: Boolean(
+                jugador?.carnet_pagado &&
+                !sancionActiva &&
+                deudasPendientes.length === 0 &&
+                jugador?.estado_pase === 'aprobado'
+              )
+            }}
+          />
         </div>
       ) : pestaña === 'partido' ? (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">

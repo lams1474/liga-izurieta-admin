@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  DollarSign, CreditCard, AlertCircle, CheckCircle2, Search, RefreshCw
+  DollarSign, CreditCard, AlertCircle, CheckCircle2, Search, RefreshCw, Plus, X, Save
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
@@ -10,8 +10,20 @@ export default function Pagos() {
   const [cargando, setCargando] = useState(true)
   const [pagaCarnets, setPagaCarnets] = useState([])
   const [deudasJugadores, setDeudasJugadores] = useState([])
+  const [jugadoresList, setJugadoresList] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [pestaña, setPestaña] = useState('carnets') // 'carnets' | 'deudas'
+
+  // Modal Registrar Pago Carnet
+  const [modalCarnetOpen, setModalCarnetOpen] = useState(false)
+  const [formCarnet, setFormCarnet] = useState({ jugador_id: '', monto: 5.0, forma_pago: 'efectivo', observaciones: '' })
+  const [guardandoCarnet, setGuardandoCarnet] = useState(false)
+
+  // Modal Cobrar Deuda
+  const [modalDeudaOpen, setModalDeudaOpen] = useState(false)
+  const [deudaSeleccionada, setDeudaSeleccionada] = useState(null)
+  const [montoCobro, setMontoCobro] = useState(0)
+  const [guardandoDeuda, setGuardandoDeuda] = useState(false)
 
   const cargarDatos = useCallback(async () => {
     setCargando(true)
@@ -38,6 +50,13 @@ export default function Pagos() {
         .order('creado_en', { ascending: false })
 
       setDeudasJugadores(dataDeudas || [])
+
+      // 3. Cargar lista de jugadores para el selector de pagos
+      const { data: listJ } = await supabase
+        .from('jugadores')
+        .select('id, nombres, apellidos, cedula, carnet_pagado')
+        .order('apellidos')
+      setJugadoresList(listJ || [])
     } catch (err) {
       console.error(err)
       toast.error('Error al cargar historial de pagos')
@@ -49,6 +68,75 @@ export default function Pagos() {
   useEffect(() => {
     cargarDatos()
   }, [cargarDatos])
+
+  async function registrarPagoCarnet() {
+    if (!formCarnet.jugador_id) {
+      toast.error('Selecciona un jugador')
+      return
+    }
+
+    setGuardandoCarnet(true)
+    try {
+      // 1. Insertar pago de carnet
+      const { error: errPago } = await supabase.from('pagos_carnet').insert({
+        jugador_id: formCarnet.jugador_id,
+        monto: parseFloat(formCarnet.monto) || 5.0,
+        forma_pago: formCarnet.forma_pago,
+        observaciones: formCarnet.observaciones,
+      })
+
+      if (errPago) throw errPago
+
+      // 2. Actualizar carnet_pagado = true en el jugador
+      const { error: errJugador } = await supabase
+        .from('jugadores')
+        .update({ carnet_pagado: true })
+        .eq('id', formCarnet.jugador_id)
+
+      if (errJugador) throw errJugador
+
+      toast.success('Pago de carnet registrado y jugador habilitado')
+      setModalCarnetOpen(false)
+      setFormCarnet({ jugador_id: '', monto: 5.0, forma_pago: 'efectivo', observaciones: '' })
+      cargarDatos()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al registrar pago: ' + err.message)
+    } finally {
+      setGuardandoCarnet(false)
+    }
+  }
+
+  async function registrarCobroDeuda() {
+    if (!deudaSeleccionada) return
+    const cobro = parseFloat(montoCobro) || 0
+    if (cobro <= 0) {
+      toast.error('Ingresa un monto válido a cobrar')
+      return
+    }
+
+    setGuardandoDeuda(true)
+    try {
+      const nuevoTotal = (deudaSeleccionada.monto_pagado || 0) + cobro
+
+      const { error } = await supabase
+        .from('deudas_jugador')
+        .update({ monto_pagado: nuevoTotal })
+        .eq('id', deudaSeleccionada.id)
+
+      if (error) throw error
+
+      toast.success('Cobro registrado correctamente')
+      setModalDeudaOpen(false)
+      setDeudaSeleccionada(null)
+      cargarDatos()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al registrar cobro: ' + err.message)
+    } finally {
+      setGuardandoDeuda(false)
+    }
+  }
 
   const totalRecaudadoCarnets = pagaCarnets.reduce((sum, p) => sum + (p.monto || 0), 0)
   const totalDeudasPendientes = deudasJugadores.reduce(
@@ -83,6 +171,13 @@ export default function Pagos() {
             Control de cobros de carnets digitales, multas y deudas de la liga
           </p>
         </div>
+
+        <button
+          onClick={() => setModalCarnetOpen(true)}
+          className="bg-green-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+        >
+          <Plus size={18} /> Registrar Pago de Carnet
+        </button>
       </div>
 
       {/* Tarjetas Resumen */}
@@ -253,6 +348,24 @@ export default function Pagos() {
                         <td className="px-6 py-4 text-gray-500 text-xs">
                           {d.fecha_emision || '—'}
                         </td>
+                        <td className="px-6 py-4 text-center">
+                          {saldo > 0 ? (
+                            <button
+                              onClick={() => {
+                                setDeudaSeleccionada(d)
+                                setMontoCobro(saldo)
+                                setModalDeudaOpen(true)
+                              }}
+                              className="px-3 py-1 bg-liga-azul text-white rounded text-xs font-semibold hover:bg-blue-800"
+                            >
+                              Cobrar
+                            </button>
+                          ) : (
+                            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
+                              Saldada
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
@@ -262,6 +375,164 @@ export default function Pagos() {
           )
         )}
       </div>
+
+      {/* MODAL: Registrar Pago Carnet */}
+      {modalCarnetOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalCarnetOpen(false)} />
+          <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="text-lg font-bold text-green-700 flex items-center gap-2">
+                  <CreditCard size={20} /> Registrar Pago de Carnet Digital
+                </h3>
+                <button onClick={() => setModalCarnetOpen(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Jugador <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formCarnet.jugador_id}
+                    onChange={(e) => setFormCarnet({ ...formCarnet, jugador_id: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  >
+                    <option value="">Seleccionar jugador...</option>
+                    {jugadoresList.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.apellidos} {j.nombres} ({j.cedula}) - {j.carnet_pagado ? '✅ Pagado' : '❌ Pendiente'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Monto ($) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={formCarnet.monto}
+                      onChange={(e) => setFormCarnet({ ...formCarnet, monto: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Forma de Pago
+                    </label>
+                    <select
+                      value={formCarnet.forma_pago}
+                      onChange={(e) => setFormCarnet({ ...formCarnet, forma_pago: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                    >
+                      <option value="efectivo">Efectivo</option>
+                      <option value="transferencia">Transferencia</option>
+                      <option value="deposito">Depósito</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Observaciones / Comprobante
+                  </label>
+                  <input
+                    type="text"
+                    value={formCarnet.observaciones}
+                    onChange={(e) => setFormCarnet({ ...formCarnet, observaciones: e.target.value })}
+                    placeholder="Ej. Transferencia Banco Pichincha #12345"
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 border-t pt-4">
+                <button
+                  onClick={() => setModalCarnetOpen(false)}
+                  disabled={guardandoCarnet}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={registrarPagoCarnet}
+                  disabled={guardandoCarnet}
+                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <Save size={16} /> {guardandoCarnet ? 'Guardando...' : 'Registrar Pago'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* MODAL: Cobrar Deuda */}
+      {modalDeudaOpen && deudaSeleccionada && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalDeudaOpen(false)} />
+          <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="text-lg font-bold text-liga-azul flex items-center gap-2">
+                  <DollarSign size={20} /> Registrar Cobro de Deuda / Multa
+                </h3>
+                <button onClick={() => setModalDeudaOpen(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <p><strong>Jugador:</strong> {deudaSeleccionada.jugador?.apellidos} {deudaSeleccionada.jugador?.nombres}</p>
+                <p><strong>Concepto:</strong> {deudaSeleccionada.concepto}</p>
+                <p><strong>Monto Total:</strong> ${deudaSeleccionada.monto?.toFixed(2)}</p>
+                <p><strong>Saldo Pendiente:</strong> ${((deudaSeleccionada.monto || 0) - (deudaSeleccionada.monto_pagado || 0)).toFixed(2)}</p>
+
+                <div className="pt-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Monto a Acreditar ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max={(deudaSeleccionada.monto || 0) - (deudaSeleccionada.monto_pagado || 0)}
+                    value={montoCobro}
+                    onChange={(e) => setMontoCobro(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 border-t pt-4">
+                <button
+                  onClick={() => setModalDeudaOpen(false)}
+                  disabled={guardandoDeuda}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={registrarCobroDeuda}
+                  disabled={guardandoDeuda}
+                  className="flex-1 bg-liga-azul text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <Save size={16} /> {guardandoDeuda ? 'Procesando...' : 'Confirmar Cobro'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
