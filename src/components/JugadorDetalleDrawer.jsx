@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useEffect, useState, useCallback } from 'react'
 import {
   X, User, Edit, DollarSign, UserMinus, AlertTriangle,
-  FileText, Phone, Hash, Shield, Award, Clock,
+  FileText, Shield, Award, Clock,
   CheckCircle, XCircle
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -30,13 +31,7 @@ export default function JugadorDetalleDrawer({
   const [montoPago, setMontoPago] = useState('1.00')
   const [guardando, setGuardando] = useState(false)
 
-  useEffect(() => {
-    if (abierto && jugadorId) {
-      cargarTodo()
-    }
-  }, [abierto, jugadorId])
-
-  async function cargarTodo() {
+  const cargarTodo = useCallback(async () => {
     setCargando(true)
 
     try {
@@ -107,7 +102,13 @@ export default function JugadorDetalleDrawer({
     } finally {
       setCargando(false)
     }
-  }
+  }, [jugadorId])
+
+  useEffect(() => {
+    if (abierto && jugadorId) {
+      cargarTodo()
+    }
+  }, [abierto, jugadorId, cargarTodo])
 
   function calcularEdad(fechaNac) {
     if (!fechaNac) return '—'
@@ -231,8 +232,16 @@ export default function JugadorDetalleDrawer({
             {/* FOTO + NOMBRE */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
-                  <User size={40} className="text-gray-400" />
+                <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden border-2 border-liga-azul/20 flex-shrink-0">
+                  {jugador.foto_url ? (
+                    <img
+                      src={jugador.foto_url}
+                      alt={`${jugador.nombres} ${jugador.apellidos}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User size={40} className="text-gray-400" />
+                  )}
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-gray-800">

@@ -4,6 +4,12 @@ import Dashboard from './pages/Dashboard'
 import Jugadores from './pages/Jugadores'
 import ImportarJugadores from './pages/ImportarJugadores'
 import Usuarios from './pages/Usuarios'
+import Equipos from './pages/Equipos'
+import Pagos from './pages/Pagos'
+import Calendario from './pages/Calendario'
+import Sanciones from './pages/Sanciones'
+import Actas from './pages/Actas'
+import Reportes from './pages/Reportes'
 import MisJugadores from './pages/MisJugadores'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -36,6 +42,72 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/reportes"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <Reportes />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/actas"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria', 'vocal', 'arbitro', 'capitan']}>
+            <Layout>
+              <Actas />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/sanciones"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria', 'delegado']}>
+            <Layout>
+              <Sanciones />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/calendario"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria', 'delegado', 'vocal', 'arbitro']}>
+            <Layout>
+              <Calendario />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pagos"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <Pagos />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/equipos"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <Equipos />
             </Layout>
           </ProtectedRoute>
         }
