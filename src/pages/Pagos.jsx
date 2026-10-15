@@ -11,6 +11,7 @@ export default function Pagos() {
   const [pagaCarnets, setPagaCarnets] = useState([])
   const [deudasJugadores, setDeudasJugadores] = useState([])
   const [jugadoresList, setJugadoresList] = useState([])
+  const [equiposList, setEquiposList] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [pestaña, setPestaña] = useState('carnets') // 'carnets' | 'deudas'
 
@@ -24,6 +25,19 @@ export default function Pagos() {
   const [deudaSeleccionada, setDeudaSeleccionada] = useState(null)
   const [montoCobro, setMontoCobro] = useState(0)
   const [guardandoDeuda, setGuardandoDeuda] = useState(false)
+
+  // Modal Nueva Deuda / Cobro a Club o Jugador
+  const [modalNuevaDeudaOpen, setModalNuevaDeudaOpen] = useState(false)
+  const [formNuevaDeuda, setFormNuevaDeuda] = useState({
+    destino: 'equipo', // 'equipo' | 'jugador'
+    equipo_id: '',
+    jugador_id: '',
+    tipo_concepto: 'inscripcion_club', // 'inscripcion_club' | 'cuota_mensual' | 'cuota_anual' | 'multa_reglamento' | 'otro'
+    concepto_personalizado: '',
+    monto: 10.0,
+    monto_pagado: 0,
+  })
+  const [guardandoNuevaDeuda, setGuardandoNuevaDeuda] = useState(false)
 
   const cargarDatos = useCallback(async () => {
     setCargando(true)
@@ -57,6 +71,13 @@ export default function Pagos() {
         .select('id, nombres, apellidos, cedula, carnet_pagado')
         .order('apellidos')
       setJugadoresList(listJ || [])
+
+      // 4. Cargar lista de equipos/clubes
+      const { data: listEq } = await supabase
+        .from('equipos')
+        .select('id, nombre, disciplina, categoria')
+        .order('nombre')
+      setEquiposList(listEq || [])
     } catch (err) {
       console.error(err)
       toast.error('Error al cargar historial de pagos')
@@ -138,6 +159,98 @@ export default function Pagos() {
     }
   }
 
+  async function crearNuevaDeuda() {
+    if (formNuevaDeuda.destino === 'equipo' && !formNuevaDeuda.equipo_id) {
+      toast.error('Selecciona un equipo/club')
+      return
+    }
+    if (formNuevaDeuda.destino === 'jugador' && !formNuevaDeuda.jugador_id) {
+      toast.error('Selecciona un jugador')
+      return
+    }
+
+    function obtenerConcepto() {
+      if (formNuevaDeuda.tipo_concepto === 'otro') {
+        return formNuevaDeuda.concepto_personalizado.trim() || 'Cobro Administrativo'
+      }
+
+      let base
+      switch (formNuevaDeuda.tipo_concepto) {
+        case 'inscripcion_club':
+          base = 'Pago de Inscripción de Club / Torneo'
+          break
+        case 'cuota_mensual':
+          base = 'Cuota Mensual de Participación'
+          break
+        case 'cuota_anual':
+          base = 'Cuota Anual de Afiliación'
+          break
+        case 'multa_reglamento':
+          base = 'Multa Reglamentaria Administrativa'
+          break
+        default:
+          base = 'Cobro Administrativo'
+          break
+      }
+
+      if (formNuevaDeuda.concepto_personalizado.trim()) {
+        base += ` - ${formNuevaDeuda.concepto_personalizado.trim()}`
+      }
+      return base
+    }
+
+    const conceptoTexto = obtenerConcepto()
+
+    const montoTotal = parseFloat(formNuevaDeuda.monto) || 0
+    if (montoTotal <= 0) {
+      toast.error('Ingresa un monto válido')
+      return
+    }
+
+    setGuardandoNuevaDeuda(true)
+    try {
+      const payload = {
+        concepto: conceptoTexto,
+        monto: montoTotal,
+        monto_pagado: parseFloat(formNuevaDeuda.monto_pagado) || 0,
+        fecha_emision: new Date().toISOString().split('T')[0],
+      }
+
+      if (formNuevaDeuda.destino === 'equipo') {
+        payload.equipo_id = formNuevaDeuda.equipo_id
+      } else {
+        payload.jugador_id = formNuevaDeuda.jugador_id
+        // Asignar el equipo si el jugador pertenece a uno
+        const jSel = jugadoresList.find((j) => j.id === formNuevaDeuda.jugador_id)
+        if (jSel?.inscripciones?.[0]?.equipo_id) {
+          payload.equipo_id = jSel.inscripciones[0].equipo_id
+        }
+      }
+
+      const { error } = await supabase.from('deudas_jugador').insert(payload)
+
+      if (error) throw error
+
+      toast.success('Cobro registrado exitosamente')
+      setModalNuevaDeudaOpen(false)
+      setFormNuevaDeuda({
+        destino: 'equipo',
+        equipo_id: '',
+        jugador_id: '',
+        tipo_concepto: 'inscripcion_club',
+        concepto_personalizado: '',
+        monto: 10.0,
+        monto_pagado: 0,
+      })
+      cargarDatos()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al registrar cobro: ' + err.message)
+    } finally {
+      setGuardandoNuevaDeuda(false)
+    }
+  }
+
   const totalRecaudadoCarnets = pagaCarnets.reduce((sum, p) => sum + (p.monto || 0), 0)
   const totalDeudasPendientes = deudasJugadores.reduce(
     (sum, d) => sum + ((d.monto || 0) - (d.monto_pagado || 0)),
@@ -172,12 +285,21 @@ export default function Pagos() {
           </p>
         </div>
 
-        <button
-          onClick={() => setModalCarnetOpen(true)}
-          className="bg-green-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
-        >
-          <Plus size={18} /> Registrar Pago de Carnet
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setModalNuevaDeudaOpen(true)}
+            className="bg-liga-azul text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-sm"
+          >
+            <Plus size={18} /> Registrar Cobro / Multa / Cuota
+          </button>
+
+          <button
+            onClick={() => setModalCarnetOpen(true)}
+            className="bg-green-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+          >
+            <Plus size={18} /> Registrar Pago Carnet
+          </button>
+        </div>
       </div>
 
       {/* Tarjetas Resumen */}
@@ -329,12 +451,20 @@ export default function Pagos() {
                     return (
                       <tr key={d.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
-                          <div className="font-semibold text-gray-900">
-                            {d.jugador?.apellidos} {d.jugador?.nombres}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {d.equipo?.nombre || 'General'}
-                          </div>
+                          {d.jugador ? (
+                            <>
+                              <div className="font-semibold text-gray-900">
+                                {d.jugador?.apellidos} {d.jugador?.nombres}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Club: {d.equipo?.nombre || '—'}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="font-bold text-liga-azul">
+                              🏰 {d.equipo?.nombre || 'Club General'}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-gray-700">
                           {d.concepto}
@@ -469,6 +599,174 @@ export default function Pagos() {
                   className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   <Save size={16} /> {guardandoCarnet ? 'Guardando...' : 'Registrar Pago'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* MODAL: Registrar Nueva Deuda / Cobro */}
+      {modalNuevaDeudaOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalNuevaDeudaOpen(false)} />
+          <div className="fixed inset-0 flex items-center justify-center z-[70] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="text-lg font-bold text-liga-azul flex items-center gap-2">
+                  <DollarSign size={20} /> Registrar Nuevo Cobro / Multa
+                </h3>
+                <button onClick={() => setModalNuevaDeudaOpen(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Dirigido A
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormNuevaDeuda({ ...formNuevaDeuda, destino: 'equipo' })}
+                      className={`py-2 rounded-lg text-xs font-bold border transition-colors ${
+                        formNuevaDeuda.destino === 'equipo'
+                          ? 'bg-liga-azul text-white border-liga-azul'
+                          : 'bg-gray-50 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      🏰 Equipo / Club
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormNuevaDeuda({ ...formNuevaDeuda, destino: 'jugador' })}
+                      className={`py-2 rounded-lg text-xs font-bold border transition-colors ${
+                        formNuevaDeuda.destino === 'jugador'
+                          ? 'bg-liga-azul text-white border-liga-azul'
+                          : 'bg-gray-50 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      👤 Jugador
+                    </button>
+                  </div>
+                </div>
+
+                {formNuevaDeuda.destino === 'equipo' ? (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Seleccionar Equipo / Club <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formNuevaDeuda.equipo_id}
+                      onChange={(e) => setFormNuevaDeuda({ ...formNuevaDeuda, equipo_id: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                    >
+                      <option value="">Seleccionar club...</option>
+                      {equiposList.map((eq) => (
+                        <option key={eq.id} value={eq.id}>
+                          {eq.nombre} ({eq.disciplina} - {eq.categoria})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Seleccionar Jugador <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formNuevaDeuda.jugador_id}
+                      onChange={(e) => setFormNuevaDeuda({ ...formNuevaDeuda, jugador_id: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                    >
+                      <option value="">Seleccionar jugador...</option>
+                      {jugadoresList.map((j) => (
+                        <option key={j.id} value={j.id}>
+                          {j.apellidos} {j.nombres} ({j.cedula})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Tipo de Concepto
+                  </label>
+                  <select
+                    value={formNuevaDeuda.tipo_concepto}
+                    onChange={(e) => setFormNuevaDeuda({ ...formNuevaDeuda, tipo_concepto: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                  >
+                    <option value="inscripcion_club">Pago de Inscripción de Club / Torneo</option>
+                    <option value="cuota_mensual">Cuota Mensual de Participación</option>
+                    <option value="cuota_anual">Cuota Anual de Afiliación</option>
+                    <option value="multa_reglamento">Multa Reglamentaria Administrativa</option>
+                    <option value="otro">Otro Concepto Personalizado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Detalle / Observación
+                  </label>
+                  <input
+                    type="text"
+                    value={formNuevaDeuda.concepto_personalizado}
+                    onChange={(e) => setFormNuevaDeuda({ ...formNuevaDeuda, concepto_personalizado: e.target.value })}
+                    placeholder="Ej. Torneo Apertura 2025 - Fecha 3"
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Monto Total ($) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={formNuevaDeuda.monto}
+                      onChange={(e) => setFormNuevaDeuda({ ...formNuevaDeuda, monto: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Abono / Pago Inicial ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max={formNuevaDeuda.monto}
+                      value={formNuevaDeuda.monto_pagado}
+                      onChange={(e) => setFormNuevaDeuda({ ...formNuevaDeuda, monto_pagado: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 border-t pt-4">
+                <button
+                  onClick={() => setModalNuevaDeudaOpen(false)}
+                  disabled={guardandoNuevaDeuda}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={crearNuevaDeuda}
+                  disabled={guardandoNuevaDeuda}
+                  className="flex-1 bg-liga-azul text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <Save size={16} /> {guardandoNuevaDeuda ? 'Guardando...' : 'Registrar Cobro'}
                 </button>
               </div>
             </div>
