@@ -162,6 +162,27 @@ export default function JugadorDetalleDrawer({
     }
   }
 
+  async function cambiarConsentimiento(valor) {
+    setGuardando(true)
+    try {
+      const { error } = await supabase
+        .from('jugadores')
+        .update({ consentimiento_firmado: valor })
+        .eq('id', jugadorId)
+
+      if (error) throw error
+
+      toast.success(valor ? 'Consentimiento de datos aceptado' : 'Consentimiento marcado como pendiente')
+      await cargarTodo()
+      onCambio?.()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al cambiar consentimiento de datos')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   async function cambiarEstadoPase(nuevoEstado) {
     setGuardando(true)
     try {
@@ -356,6 +377,26 @@ export default function JugadorDetalleDrawer({
                 <div>
                   <p className="text-gray-500 text-xs">Teléfono</p>
                   <p className="font-semibold">{jugador.telefono || '—'}</p>
+                </div>
+                <div className="col-span-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 text-xs">Consentimiento de Datos</p>
+                    <p className={`font-semibold text-xs ${jugador.consentimiento_firmado ? 'text-green-600' : 'text-red-600'}`}>
+                      {jugador.consentimiento_firmado ? '✓ Aceptado / Firmado' : '✕ No Aceptado (Pendiente)'}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => cambiarConsentimiento(!jugador.consentimiento_firmado)}
+                    disabled={guardando}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                      jugador.consentimiento_firmado
+                        ? 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                  >
+                    {jugador.consentimiento_firmado ? 'Revocar Consentimiento' : 'Aceptar Consentimiento'}
+                  </button>
                 </div>
                 {jugador.es_menor && (
                   <>
