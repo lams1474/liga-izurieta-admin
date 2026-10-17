@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Users, Building2, DollarSign, Calendar, AlertTriangle,
   FileText, BarChart3, UserCog, QrCode, Menu, X,
+  ShieldCheck, BookUser
 } from 'lucide-react'
 
 const menusPorRol = {
@@ -30,6 +31,9 @@ const menusPorRol = {
   delegado: [
     { path: '/', label: 'Inicio', icon: Home },
     { path: '/mis-jugadores', label: 'Mis Jugadores', icon: Users },
+    { path: '/mi-club', label: 'Mi Club', icon: ShieldCheck },
+    { path: '/mis-pases', label: 'Mis Pases', icon: BookUser },
+    { path: '/mi-nomina', label: 'Mi Nómina', icon: FileText },
   ],
   jugador: [
     { path: '/mi-carnet', label: 'Mi Carnet Digital', icon: QrCode },
@@ -70,6 +74,7 @@ export default function Sidebar({ usuario }) {
 
   return (
     <>
+      {/* Botón hamburguesa para móvil */}
       <button
         onClick={() => setMenuMovilAbierto(true)}
         className="md:hidden fixed bottom-4 right-4 z-50 bg-liga-azul text-white p-3 rounded-full shadow-2xl hover:bg-liga-azul/90 transition-all"
@@ -78,6 +83,7 @@ export default function Sidebar({ usuario }) {
         <Menu size={24} />
       </button>
 
+      {/* Sidebar Desktop */}
       <aside className="bg-white shadow-md w-64 min-h-[calc(100vh-64px)] hidden md:block">
         <nav className="py-4">
           {menu.map((item) => {
@@ -102,6 +108,7 @@ export default function Sidebar({ usuario }) {
         </nav>
       </aside>
 
+      {/* Overlay oscuro para móvil */}
       {menuMovilAbierto && (
         <div
           onClick={() => setMenuMovilAbierto(false)}
@@ -109,6 +116,7 @@ export default function Sidebar({ usuario }) {
         />
       )}
 
+      {/* Sidebar Móvil */}
       <aside
         className={`md:hidden fixed top-0 left-0 h-full w-64 bg-white shadow-2xl z-50 transform transition-transform duration-300 ${
           menuMovilAbierto ? 'translate-x-0' : '-translate-x-full'
