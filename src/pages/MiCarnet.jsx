@@ -1,9 +1,12 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import CarnetDigitalCard from '../components/CarnetDigitalCard'
-import { CreditCard, Calendar, Trophy, History, Shield, AlertCircle } from 'lucide-react'
+import { descargarComoImagen, descargarComoPDF } from '../lib/carnetUtils'
+import {
+  CreditCard, Calendar, Trophy, History, Shield, AlertCircle, Download
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function MiCarnet() {
@@ -14,7 +17,9 @@ export default function MiCarnet() {
   const [proximoPartido, setProximoPartido] = useState(null)
   const [sancionActiva, setSancionActiva] = useState(null)
   const [deudasPendientes, setDeudasPendientes] = useState([])
-  const [pestaña, setPestaña] = useState('carnet') // carnet | partido | stats | historial
+  const [pestaña, setPestaña] = useState('carnet')
+
+  const carnetRef = useRef(null)
 
   const cargarDatosJugador = useCallback(async () => {
     setCargando(true)
@@ -24,18 +29,27 @@ export default function MiCarnet() {
         return
       }
 
-      // 1. Obtener datos del jugador
-      const { data: dataJugador, error: errJugador } = await supabase
+      // Buscar jugador por user_id (nuevo) o por cédula (fallback)
+      let query = supabase
         .from('jugadores')
         .select(`
           *,
           inscripciones:jugador_equipo (
             id, dorsal, posicion, activo,
-            equipo:equipos!jugador_equipo_equipo_id_fkey (id, nombre, disciplina, categoria)
+            equipo:equipos!jugador_equipo_equipo_id_fkey (id, nombre, disciplina, categoria, escudo_url)
           )
         `)
-        .eq('cedula', usuario.email?.split('@')[0] || '')
-        .maybeSingle()
+
+      if (usuario.rol === 'jugador' && usuario.jugador_id) {
+        query = query.eq('id', usuario.jugador_id)
+      } else if (usuario.cedula) {
+        query = query.eq('cedula', usuario.cedula)
+      } else {
+        setCargando(false)
+        return
+      }
+
+      const { data: dataJugador, error: errJugador } = await query.maybeSingle()
 
       if (errJugador) console.error(errJugador)
 
@@ -57,7 +71,9 @@ export default function MiCarnet() {
           .select('*')
           .eq('jugador_id', dataJugador.id)
 
-        const pendientes = (deudasData || []).filter((d) => (d.monto || 0) > (d.monto_pagado || 0))
+        const pendientes = (deudasData || []).filter(
+          (d) => (d.monto || 0) > (d.monto_pagado || 0)
+        )
         setDeudasPendientes(pendientes)
 
         const inscActiva = dataJugador.inscripciones?.find((i) => i.activo)
@@ -72,32 +88,15 @@ export default function MiCarnet() {
               equipo_local:equipos!partidos_equipo_local_id_fkey (nombre),
               equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (nombre)
             `)
-            .or(`equipo_local_id.eq.${inscActiva.equipo.id},equipo_visitante_id.eq.${inscActiva.equipo.id}`)
+            .or(
+              `equipo_local_id.eq.${inscActiva.equipo.id},equipo_visitante_id.eq.${inscActiva.equipo.id}`
+            )
             .neq('estado', 'finalizado')
             .order('fecha_partido', { ascending: true })
             .limit(1)
             .maybeSingle()
 
           setProximoPartido(partidoData)
-        }
-      } else {
-        // Cargar jugador genérico de muestra para demostración
-        const { data: muestra } = await supabase
-          .from('jugadores')
-          .select(`
-            *,
-            inscripciones:jugador_equipo (
-              id, dorsal, posicion, activo,
-              equipo:equipos!jugador_equipo_equipo_id_fkey (id, nombre, disciplina, categoria)
-            )
-          `)
-          .limit(1)
-          .maybeSingle()
-
-        if (muestra) {
-          setJugador(muestra)
-          const inscActiva = muestra.inscripciones?.find((i) => i.activo)
-          if (inscActiva?.equipo) setEquipo(inscActiva.equipo)
         }
       }
     } catch (err) {
@@ -111,6 +110,29 @@ export default function MiCarnet() {
   useEffect(() => {
     cargarDatosJugador()
   }, [cargarDatosJugador])
+
+  // ============ DESCARGAS ============
+  async function handleDescargarImagen() {
+    if (!carnetRef.current || !jugador) return
+    try {
+      await descargarComoImagen(carnetRef.current, `carnet-${jugador.cedula}.png`)
+      toast.success('Imagen descargada')
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al descargar la imagen')
+    }
+  }
+
+  async function handleDescargarPDF() {
+    if (!carnetRef.current || !jugador) return
+    try {
+      await descargarComoPDF(carnetRef.current, `carnet-${jugador.cedula}.pdf`)
+      toast.success('PDF descargado')
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al descargar el PDF')
+    }
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -184,10 +206,20 @@ export default function MiCarnet() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-liga-azul mx-auto"></div>
           <p className="mt-3 text-sm text-gray-500">Cargando carnet digital...</p>
         </div>
+      ) : !jugador ? (
+        <div className="p-12 text-center bg-white rounded-xl shadow-sm">
+          <AlertCircle className="mx-auto text-amber-500 mb-3" size={48} />
+          <h2 className="text-lg font-bold text-gray-700 mb-1">
+            No se encontró tu registro de jugador
+          </h2>
+          <p className="text-sm text-gray-500">
+            Contacta a tu delegado para que verifique tu inscripción.
+          </p>
+        </div>
       ) : pestaña === 'carnet' ? (
         <div className="space-y-6">
-          {/* Alertas sobre estado del carnet */}
-          {jugador && !jugador.consentimiento_firmado && (
+          {/* Alertas */}
+          {!jugador.consentimiento_firmado && (
             <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-800 rounded-r-xl text-sm flex items-start gap-3">
               <AlertCircle size={20} className="flex-shrink-0 text-red-600 mt-0.5" />
               <div>
@@ -199,7 +231,7 @@ export default function MiCarnet() {
             </div>
           )}
 
-          {jugador && !jugador.carnet_pagado && (
+          {!jugador.carnet_pagado && (
             <div className="p-4 bg-amber-50 border-l-4 border-amber-500 text-amber-800 rounded-r-xl text-sm flex items-start gap-3">
               <AlertCircle size={20} className="flex-shrink-0 text-amber-600 mt-0.5" />
               <div>
@@ -217,7 +249,8 @@ export default function MiCarnet() {
               <div>
                 <p className="font-bold">Sanción Disciplinaria Activa</p>
                 <p className="text-xs text-red-700 mt-0.5">
-                  Motivo: {sancionActiva.motivo} ({sancionActiva.fechas_cumplidas || 0}/{sancionActiva.fechas_sancion || 1} fechas cumplidas)
+                  Motivo: {sancionActiva.motivo} ({sancionActiva.fechas_cumplidas || 0}/
+                  {sancionActiva.fechas_sancion || 1} fechas cumplidas)
                 </p>
               </div>
             </div>
@@ -229,25 +262,51 @@ export default function MiCarnet() {
               <div>
                 <p className="font-bold">Multa / Deuda Pendiente de Pago</p>
                 <p className="text-xs text-red-700 mt-0.5">
-                  Tienes {deudasPendientes.length} multa(s) pendiente(s) por un total de ${deudasPendientes.reduce((s, d) => s + ((d.monto || 0) - (d.monto_pagado || 0)), 0).toFixed(2)}.
+                  Tienes {deudasPendientes.length} multa(s) pendiente(s) por un total de $
+                  {deudasPendientes
+                    .reduce((s, d) => s + ((d.monto || 0) - (d.monto_pagado || 0)), 0)
+                    .toFixed(2)}
+                  .
                 </p>
               </div>
             </div>
           )}
 
-          <CarnetDigitalCard
-            jugador={jugador}
-            equipo={equipo}
-            validacion={{
-              esHabilitado: Boolean(
-                jugador?.carnet_pagado &&
-                jugador?.consentimiento_firmado !== false &&
-                !sancionActiva &&
-                deudasPendientes.length === 0 &&
-                jugador?.estado_pase === 'aprobado'
-              )
-            }}
-          />
+          {/* Carnet + Botones */}
+          <div className="flex flex-col items-center gap-4">
+            <CarnetDigitalCard
+              ref={carnetRef}
+              jugador={jugador}
+              equipo={equipo}
+              validacion={{
+                esHabilitado: Boolean(
+                  jugador.carnet_pagado &&
+                    jugador.consentimiento_firmado !== false &&
+                    !sancionActiva &&
+                    deudasPendientes.length === 0 &&
+                    jugador.estado_pase === 'aprobado'
+                ),
+              }}
+            />
+
+            {/* Botones de descarga */}
+            <div className="flex flex-wrap gap-2 justify-center">
+              <button
+                onClick={handleDescargarImagen}
+                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-200 flex items-center gap-2 transition-colors"
+              >
+                <Download size={16} />
+                Descargar Imagen
+              </button>
+              <button
+                onClick={handleDescargarPDF}
+                className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 flex items-center gap-2 transition-colors"
+              >
+                <Download size={16} />
+                Descargar PDF
+              </button>
+            </div>
+          </div>
         </div>
       ) : pestaña === 'partido' ? (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -259,9 +318,12 @@ export default function MiCarnet() {
           {proximoPartido ? (
             <div className="p-5 bg-blue-50/50 rounded-xl border border-blue-100 flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="text-center md:text-left">
-                <p className="text-xs text-gray-500 uppercase font-semibold">Fecha y Hora</p>
+                <p className="text-xs text-gray-500 uppercase font-semibold">
+                  Fecha y Hora
+                </p>
                 <p className="text-lg font-bold text-liga-azul mt-0.5">
-                  {proximoPartido.fecha_partido} · {proximoPartido.hora_partido?.substring(0, 5)}
+                  {proximoPartido.fecha_partido} ·{' '}
+                  {proximoPartido.hora_partido?.substring(0, 5)}
                 </p>
                 <p className="text-xs text-gray-600 mt-1">
                   📍 {proximoPartido.lugar || 'Cancha Oficial de la Liga'}
@@ -270,7 +332,9 @@ export default function MiCarnet() {
 
               <div className="flex items-center gap-4 text-center font-bold text-gray-800">
                 <span>{proximoPartido.equipo_local?.nombre}</span>
-                <span className="bg-liga-azul text-white px-3 py-1 rounded-lg text-xs">VS</span>
+                <span className="bg-liga-azul text-white px-3 py-1 rounded-lg text-xs">
+                  VS
+                </span>
                 <span>{proximoPartido.equipo_visitante?.nombre}</span>
               </div>
             </div>
@@ -284,19 +348,25 @@ export default function MiCarnet() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 text-center">
             <Trophy className="mx-auto text-liga-amarillo mb-2" size={32} />
-            <p className="text-xs text-gray-500 uppercase font-semibold">Goles Convertidos</p>
+            <p className="text-xs text-gray-500 uppercase font-semibold">
+              Goles Convertidos
+            </p>
             <p className="text-3xl font-black text-gray-800 mt-1">0</p>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 text-center">
             <AlertCircle className="mx-auto text-amber-500 mb-2" size={32} />
-            <p className="text-xs text-gray-500 uppercase font-semibold">Amarillas Acumuladas</p>
+            <p className="text-xs text-gray-500 uppercase font-semibold">
+              Amarillas Acumuladas
+            </p>
             <p className="text-3xl font-black text-amber-600 mt-1">0 / 4</p>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 text-center">
             <Shield className="mx-auto text-liga-rojo mb-2" size={32} />
-            <p className="text-xs text-gray-500 uppercase font-semibold">Tarjetas Rojas</p>
+            <p className="text-xs text-gray-500 uppercase font-semibold">
+              Tarjetas Rojas
+            </p>
             <p className="text-3xl font-black text-liga-rojo mt-1">0</p>
           </div>
         </div>

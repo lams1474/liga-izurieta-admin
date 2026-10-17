@@ -12,9 +12,23 @@ import Actas from './pages/Actas'
 import Reportes from './pages/Reportes'
 import MiCarnet from './pages/MiCarnet'
 import MisJugadores from './pages/MisJugadores'
+import RegistroJugador from './pages/RegistroJugador'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
+
+// Componente que decide qué mostrar en "/" según el rol
+function HomeRedirect() {
+  const { usuario } = useAuth()
+
+  // Los jugadores van directo a su carnet
+  if (usuario?.rol === 'jugador') {
+    return <Navigate to="/mi-carnet" replace />
+  }
+
+  // Los demás ven el Dashboard
+  return <Dashboard />
+}
 
 function App() {
   const { estaAutenticado, cargando } = useAuth()
@@ -38,11 +52,16 @@ function App() {
       />
 
       <Route
+        path="/registro"
+        element={estaAutenticado ? <Navigate to="/" replace /> : <RegistroJugador />}
+      />
+
+      <Route
         path="/"
         element={
           <ProtectedRoute>
             <Layout>
-              <Dashboard />
+              <HomeRedirect />
             </Layout>
           </ProtectedRoute>
         }
@@ -114,7 +133,6 @@ function App() {
         }
       />
 
-      {/* Rutas del admin/secretaría */}
       <Route
         path="/jugadores"
         element={
@@ -148,7 +166,7 @@ function App() {
         }
       />
 
-      {/* Rutas del jugador */}
+      {/* Ruta del carnet - accesible para TODOS los roles */}
       <Route
         path="/mi-carnet"
         element={
@@ -171,7 +189,6 @@ function App() {
         }
       />
 
-      {/* Rutas del presidente */}
       <Route
         path="/mis-jugadores"
         element={

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -74,6 +74,19 @@ export default function Login() {
             {cargando ? 'Ingresando...' : 'Iniciar sesión'}
           </button>
         </form>
+
+        {/* Botón de registro para jugadores */}
+        <div className="mt-6 pt-6 border-t text-center">
+          <p className="text-sm text-gray-600 mb-3">
+            ¿Eres jugador y aún no tienes cuenta?
+          </p>
+          <Link
+            to="/registro"
+            className="inline-block w-full bg-liga-amarillo text-liga-azul py-3 rounded-md font-semibold hover:bg-liga-amarillo/90 transition-colors"
+          >
+            Regístrate aquí
+          </Link>
+        </div>
 
         <p className="text-xs text-gray-400 text-center mt-6">
           Sistema oficial - Liga Deportiva Barrial José Ignacio Izurieta
