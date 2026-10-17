@@ -32,6 +32,9 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
   const [errores, setErrores] = useState({})
 
+  // Consentimiento LOPDP
+  const [consentimiento, setConsentimiento] = useState(false)
+
   // ============ ESTADOS PARA LA FOTO ============
   const [archivoFoto, setArchivoFoto] = useState(null)
   const [previewFoto, setPreviewFoto] = useState(null)
@@ -123,6 +126,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
     setArchivoFoto(null)
     setPreviewFoto(null)
     setFotoEliminada(false)
+    setConsentimiento(jugadorEditar?.consentimiento_firmado || false)
   }, [jugadorEditar, abierto])
 
   function actualizarCampo(campo, valor) {
@@ -222,6 +226,10 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
       }
       if (!form.tutor_telefono.trim()) nuevosErrores.tutor_telefono = 'Obligatorio para menores'
     }
+    
+    if (!consentimiento) {
+      nuevosErrores.consentimiento = 'Debe autorizar el tratamiento de datos'
+    }
 
     setErrores(nuevosErrores)
     return Object.keys(nuevosErrores).length === 0
@@ -254,6 +262,8 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
             tutor_nombre: esMenor ? form.tutor_nombre.toUpperCase().trim() : null,
             tutor_cedula: esMenor ? form.tutor_cedula.trim() : null,
             tutor_telefono: esMenor ? form.tutor_telefono.trim() : null,
+            consentimiento_firmado: consentimiento,
+            consentimiento_fecha: consentimiento ? new Date().toISOString() : jugadorEditar.consentimiento_fecha,
           })
           .eq('id', jugadorEditar.id)
 
@@ -358,7 +368,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
           return
         }
 
-        // 1. Insertar jugador (sin foto todavía)
+        // 1. Insertar jugador (CORREGIDO EL DUPLICADO AQUÍ)
         const { data: nuevoJugador, error: errJugador } = await supabase
           .from('jugadores')
           .insert({
@@ -371,11 +381,12 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
             club_anterior: form.club_anterior.trim() || null,
             estado_pase: 'pendiente',
             calificado: false,
-            consentimiento_firmado: false,
             foto_actualizada: false,
             tutor_nombre: esMenor ? form.tutor_nombre.toUpperCase().trim() : null,
             tutor_cedula: esMenor ? form.tutor_cedula.trim() : null,
             tutor_telefono: esMenor ? form.tutor_telefono.trim() : null,
+            consentimiento_firmado: consentimiento,
+            consentimiento_fecha: new Date().toISOString(),
           })
           .select()
           .single()
@@ -549,8 +560,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
                 className="hidden"
               />
 
-              {/* Input para tomar foto (mejor compatibilidad) */}
-              
+              {/* Input para tomar foto */}
               <input
                 ref={inputCamaraRef}
                 type="file"
@@ -744,6 +754,45 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
               </div>
             </section>
           )}
+
+          {/* SECCIÓN: Consentimiento LOPDP */}
+          <section>
+            <h3 className="text-sm font-bold text-liga-azul uppercase mb-3 pb-2 border-b">
+              Consentimiento de Datos (LOPDP)
+            </h3>
+
+            <div className={`p-4 rounded-lg border-2 ${
+              errores.consentimiento ? 'border-red-300 bg-red-50' : 'border-blue-200 bg-blue-50'
+            }`}>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consentimiento}
+                  onChange={(e) => {
+                    setConsentimiento(e.target.checked)
+                    setErrores(prev => ({ ...prev, consentimiento: null }))
+                  }}
+                  className="mt-1 w-5 h-5 text-liga-azul rounded focus:ring-liga-azul flex-shrink-0"
+                />
+                <div className="text-sm">
+                  <p className="font-semibold text-gray-800 mb-1">
+                    {esMenor ? 'Autorización del Tutor Legal' : 'Autorización del Jugador'}
+                  </p>
+                  <p className="text-gray-600 text-xs leading-relaxed">
+                    {esMenor 
+                      ? 'Declaro ser el tutor legal del jugador y AUTORIZO a la Liga Deportiva Barrial José Ignacio Izurieta a recopilar, almacenar y tratar los datos personales del menor (nombres, cédula, fecha de nacimiento, fotografía) con la finalidad exclusiva de gestionar su participación en el campeonato, cumpliendo con la Ley Orgánica de Protección de Datos Personales.'
+                      : 'AUTORIZO a la Liga Deportiva Barrial José Ignacio Izurieta a recopilar, almacenar y tratar mis datos personales (nombres, cédula, fecha de nacimiento, fotografía) con la finalidad exclusiva de gestionar mi participación en el campeonato, cumpliendo con la Ley Orgánica de Protección de Datos Personales.'}
+                  </p>
+                </div>
+              </label>
+
+              {errores.consentimiento && (
+                <p className="text-xs text-red-500 mt-2 font-semibold">
+                  ⚠️ {errores.consentimiento}
+                </p>
+              )}
+            </div>
+          </section>
 
           {/* SECCIÓN: Datos deportivos */}
           <section>
