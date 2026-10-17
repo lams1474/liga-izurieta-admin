@@ -1,216 +1,391 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect, useCallback } from 'react'
-import { Calendar, Clock, MapPin, CheckCircle, Search, Filter, RefreshCw } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { Calendar, Plus, Clock, MapPin } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Calendario() {
-  const [cargando, setCargando] = useState(true)
+  const [etapas, setEtapas] = useState([])
+  const [fechas, setFechas] = useState([])
   const [partidos, setPartidos] = useState([])
-  const [busqueda, setBusqueda] = useState('')
-  const [filtroDisciplina, setFiltroDisciplina] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState('todos') // todos | programados | finalizados
+  const [equipos, setEquipos] = useState([])
+  const [arbitros, setArbitros] = useState([])
 
-  const cargarCalendario = useCallback(async () => {
-    setCargando(true)
-    try {
-      const { data, error } = await supabase
-        .from('partidos')
-        .select(`
-          id, fecha_partido, hora_partido, lugar, estado, goles_local, goles_visitante,
-          equipo_local:equipos!partidos_equipo_local_id_fkey (id, nombre, disciplina, categoria),
-          equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina, categoria)
-        `)
-        .order('fecha_partido', { ascending: true })
+  const [etapaSeleccionada, setEtapaSeleccionada] = useState('')
+  const [fechaSeleccionada, setFechaSeleccionada] = useState('')
 
-      if (error) throw error
-      setPartidos(data || [])
-    } catch (err) {
-      console.error(err)
-      toast.error('Error al cargar calendario de partidos')
-    } finally {
+  const [cargando, setCargando] = useState(true)
+
+  // Modales
+  const [modalEtapa, setModalEtapa] = useState(false)
+  const [modalFecha, setModalFecha] = useState(false)
+  const [modalPartido, setModalPartido] = useState(false)
+
+  // Formularios
+  const [formEtapa, setFormEtapa] = useState({ nombre: '', disciplina: 'futbol', categoria: 'hombres', fecha_inicio: '', fecha_fin: '' })
+  const [formFecha, setFormFecha] = useState({ numero: '', fecha_inicio: '', fecha_fin: '' })
+  const [formPartido, setFormPartido] = useState({ hora: '', cancha: '', equipo_local_id: '', equipo_visitante_id: '', arbitro_id: '' })
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    async function cargarInicial() {
+      const { data: eq } = await supabase.from('equipos').select('id, nombre, disciplina, categoria').eq('activo', true).order('nombre')
+      const { data: arb } = await supabase.from('arbitros').select('id, nombres, apellidos').eq('activo', true).order('apellidos')
+      const { data: et } = await supabase.from('etapas').select('*').order('fecha_inicio', { ascending: false })
+
+      setEquipos(eq || [])
+      setArbitros(arb || [])
+      setEtapas(et || [])
+      
+      if (et && et.length > 0) {
+        setEtapaSeleccionada(et[0].id)
+      }
       setCargando(false)
     }
+    cargarInicial()
   }, [])
 
+  // Cargar fechas cuando cambia la etapa
   useEffect(() => {
-    cargarCalendario()
-  }, [cargarCalendario])
+    async function cargarFechas() {
+      if (!etapaSeleccionada) {
+        setFechas([])
+        setFechaSeleccionada('')
+        return
+      }
+      const { data } = await supabase.from('fechas').select('*').eq('etapa_id', etapaSeleccionada).order('numero')
+      setFechas(data || [])
+      
+      if (data && data.length > 0) {
+        setFechaSeleccionada(data[0].id)
+      } else {
+        setFechaSeleccionada('')
+      }
+    }
+    cargarFechas()
+  }, [etapaSeleccionada])
 
-  const partidosFiltrados = partidos.filter((p) => {
-    const eqLocal = p.equipo_local?.nombre?.toLowerCase() || ''
-    const eqVis = p.equipo_visitante?.nombre?.toLowerCase() || ''
-    const txt = busqueda.toLowerCase()
+  // Cargar partidos cuando cambia la fecha
+  useEffect(() => {
+    async function cargarPartidos() {
+      if (!fechaSeleccionada) {
+        setPartidos([])
+        return
+      }
+      const { data } = await supabase
+        .from('partidos')
+        .select(`
+          id, hora, cancha, jugado, goles_local, goles_visitante,
+          local:equipos!partidos_equipo_local_id_fkey (id, nombre),
+          visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre),
+          arbitro:arbitros (id, nombres, apellidos)
+        `)
+        .eq('fecha_id', fechaSeleccionada)
+        .order('hora')
+      setPartidos(data || [])
+    }
+    cargarPartidos()
+  }, [fechaSeleccionada])
 
-    if (busqueda && !eqLocal.includes(txt) && !eqVis.includes(txt)) return false
+  // === CREAR ETAPA ===
+  async function crearEtapa(e) {
+    e.preventDefault()
+    if (!formEtapa.nombre || !formEtapa.fecha_inicio || !formEtapa.fecha_fin) return toast.error('Llena los campos obligatorios')
 
-    if (filtroDisciplina && p.equipo_local?.disciplina !== filtroDisciplina) return false
+    const { data, error } = await supabase.from('etapas').insert({
+      nombre: formEtapa.nombre,
+      disciplina: formEtapa.disciplina,
+      categoria: formEtapa.categoria,
+      fecha_inicio: formEtapa.fecha_inicio,
+      fecha_fin: formEtapa.fecha_fin,
+      activa: true
+    }).select().single()
 
-    if (filtroEstado === 'programados' && p.estado === 'finalizado') return false
-    if (filtroEstado === 'finalizados' && p.estado !== 'finalizado') return false
+    if (error) return toast.error(error.message)
+    
+    toast.success('Etapa creada')
+    setEtapas([data, ...etapas])
+    setEtapaSeleccionada(data.id)
+    setModalEtapa(false)
+    setFormEtapa({ nombre: '', disciplina: 'futbol', categoria: 'hombres', fecha_inicio: '', fecha_fin: '' })
+  }
 
-    return true
-  })
+  // === CREAR FECHA ===
+  async function crearFecha(e) {
+    e.preventDefault()
+    if (!formFecha.numero || !formFecha.fecha_inicio) return toast.error('Llena los campos obligatorios')
 
-  const programados = partidos.filter((p) => p.estado !== 'finalizado').length
-  const finalizados = partidos.filter((p) => p.estado === 'finalizado').length
+    const { data, error } = await supabase.from('fechas').insert({
+      etapa_id: etapaSeleccionada,
+      numero: parseInt(formFecha.numero),
+      fecha_inicio: formFecha.fecha_inicio,
+      fecha_fin: formFecha.fecha_fin || formFecha.fecha_inicio,
+      activa: true
+    }).select().single()
+
+    if (error) return toast.error(error.message)
+
+    toast.success('Fecha creada')
+    setFechas([...fechas, data].sort((a,b) => a.numero - b.numero))
+    setFechaSeleccionada(data.id)
+    setModalFecha(false)
+    setFormFecha({ numero: '', fecha_inicio: '', fecha_fin: '' })
+  }
+
+  // === CREAR PARTIDO ===
+  async function crearPartido(e) {
+    e.preventDefault()
+    if (!formPartido.equipo_local_id || !formPartido.equipo_visitante_id) return toast.error('Selecciona los equipos')
+    if (formPartido.equipo_local_id === formPartido.equipo_visitante_id) return toast.error('Un equipo no puede jugar contra sí mismo')
+
+    const { data, error } = await supabase.from('partidos').insert({
+      fecha_id: fechaSeleccionada,
+      hora: formPartido.hora || null,
+      cancha: formPartido.cancha || null,
+      equipo_local_id: formPartido.equipo_local_id,
+      equipo_visitante_id: formPartido.equipo_visitante_id,
+      arbitro_id: formPartido.arbitro_id || null,
+      jugado: false
+    }).select(`
+      id, hora, cancha, jugado, goles_local, goles_visitante,
+      local:equipos!partidos_equipo_local_id_fkey (id, nombre),
+      visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre),
+      arbitro:arbitros (id, nombres, apellidos)
+    `).single()
+
+    if (error) return toast.error(error.message)
+
+    toast.success('Partido programado')
+    setPartidos([...partidos, data].sort((a,b) => (a.hora || '').localeCompare(b.hora || '')))
+    setModalPartido(false)
+    setFormPartido({ hora: '', cancha: '', equipo_local_id: '', equipo_visitante_id: '', arbitro_id: '' })
+  }
+
+  // Filtrar equipos por la categoría/disciplina de la etapa seleccionada
+  const etapaActual = etapas.find(e => e.id === etapaSeleccionada)
+  const equiposFiltrados = equipos.filter(e => 
+    !etapaActual || (e.disciplina === etapaActual.disciplina && e.categoria === etapaActual.categoria)
+  )
+
+  if (cargando) return <div className="p-8 text-center">Cargando calendario...</div>
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Encabezado */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Calendar className="text-liga-azul" size={28} />
-            Módulo de Calendario y Fixture
-          </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Programación semanal de partidos, canchas, horarios y resultados
-          </p>
+          <h1 className="text-2xl font-bold text-liga-azul">Calendario y Partidos</h1>
+          <p className="text-sm text-gray-500">Programa las jornadas del campeonato</p>
         </div>
+        <button
+          onClick={() => setModalEtapa(true)}
+          className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 flex items-center gap-2"
+        >
+          <Plus size={18} /> Nueva Etapa
+        </button>
       </div>
 
-      {/* Tarjetas resumen */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">Total Partidos</p>
-            <p className="text-2xl font-bold text-liga-azul mt-1">{partidos.length}</p>
-          </div>
-          <div className="w-10 h-10 bg-blue-50 text-liga-azul rounded-lg flex items-center justify-center">
-            <Calendar size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">Programados</p>
-            <p className="text-2xl font-bold text-amber-600 mt-1">{programados}</p>
-          </div>
-          <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center">
-            <Clock size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">Finalizados</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">{finalizados}</p>
-          </div>
-          <div className="w-10 h-10 bg-green-50 text-green-600 rounded-lg flex items-center justify-center">
-            <CheckCircle size={20} />
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full md:w-80">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por equipo..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 text-sm">
-            <Filter size={16} className="text-gray-500" />
-            <select
-              value={filtroDisciplina}
-              onChange={(e) => setFiltroDisciplina(e.target.value)}
-              className="bg-transparent border-none text-gray-700 text-sm focus:outline-none"
-            >
-              <option value="">Todas las disciplinas</option>
-              <option value="futsala">Futsala</option>
-              <option value="futbol">Fútbol</option>
-              <option value="ecuavoly">Ecuavoly</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 text-sm">
-            <select
-              value={filtroEstado}
-              onChange={(e) => setFiltroEstado(e.target.value)}
-              className="bg-transparent border-none text-gray-700 text-sm focus:outline-none"
-            >
-              <option value="todos">Todos los estados</option>
-              <option value="programados">Próximos / Programados</option>
-              <option value="finalizados">Finalizados</option>
-            </select>
-          </div>
-
-          <button
-            onClick={cargarCalendario}
-            className="p-2 text-gray-600 hover:text-liga-azul rounded-lg hover:bg-gray-100 transition-colors"
-            title="Recargar partidos"
+      {/* Selectores */}
+      <div className="bg-white p-4 rounded-lg shadow-md mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Etapa</label>
+          <select
+            value={etapaSeleccionada}
+            onChange={(e) => setEtapaSeleccionada(e.target.value)}
+            className="w-full px-3 py-2 border rounded-md"
           >
-            <RefreshCw size={18} />
-          </button>
+            <option value="">Selecciona Etapa</option>
+            {etapas.map(e => (
+              <option key={e.id} value={e.id}>{e.nombre} ({e.disciplina} - {e.categoria})</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha (Jornada)</label>
+          <div className="flex gap-2">
+            <select
+              value={fechaSeleccionada}
+              onChange={(e) => setFechaSeleccionada(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md"
+              disabled={!etapaSeleccionada}
+            >
+              <option value="">Selecciona Fecha</option>
+              {fechas.map(f => (
+                <option key={f.id} value={f.id}>Fecha {f.numero} ({new Date(f.fecha_inicio + 'T00:00:00').toLocaleDateString()})</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setModalFecha(true)}
+              disabled={!etapaSeleccionada}
+              className="bg-gray-200 text-gray-700 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50"
+              title="Añadir Fecha"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Lista de partidos */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {cargando ? (
-          <div className="p-12 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-liga-azul mx-auto"></div>
-            <p className="mt-3 text-sm text-gray-500">Cargando partidos...</p>
+      {/* Lista de Partidos */}
+      {fechaSeleccionada ? (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-liga-azul text-white p-4 flex justify-between items-center">
+            <h3 className="font-bold">Partidos Programados</h3>
+            <button
+              onClick={() => setModalPartido(true)}
+              className="bg-liga-rojo text-white px-3 py-1.5 rounded text-sm font-semibold hover:bg-liga-rojo/90 flex items-center gap-1"
+            >
+              <Plus size={16} /> Programar Partido
+            </button>
           </div>
-        ) : partidosFiltrados.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">
-            No hay partidos programados que coincidan con la búsqueda.
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {partidosFiltrados.map((p) => (
-              <div key={p.id} className="p-4 hover:bg-gray-50 transition-colors flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4 text-xs text-gray-500 w-full md:w-auto">
-                  <div className="bg-blue-50 text-liga-azul px-3 py-1.5 rounded-lg font-semibold text-center min-w-[90px]">
-                    <div>{p.fecha_partido || 'Por definir'}</div>
-                    <div className="text-[11px] font-normal text-gray-600">{p.hora_partido?.substring(0, 5) || '--:--'}</div>
+
+          {partidos.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              No hay partidos en esta fecha.
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {partidos.map(p => (
+                <div key={p.id} className="p-4 flex flex-col sm:flex-row items-center justify-between hover:bg-gray-50 gap-4">
+                  <div className="flex-1 text-center sm:text-right font-semibold text-gray-700">
+                    {p.local?.nombre}
                   </div>
-                  <div className="flex items-center gap-1 text-gray-600">
-                    <MapPin size={14} className="text-gray-400" />
-                    <span>{p.lugar || 'Cancha Principal'}</span>
+                  
+                  <div className="flex flex-col items-center px-4">
+                    {p.jugado ? (
+                      <div className="text-2xl font-bold text-liga-azul">{p.goles_local} - {p.goles_visitante}</div>
+                    ) : (
+                      <div className="text-xl font-bold text-gray-300">VS</div>
+                    )}
+                    <div className="flex gap-3 text-xs text-gray-500 mt-2">
+                      <span className="flex items-center gap-1"><Clock size={12}/> {p.hora?.slice(0,5) || '--:--'}</span>
+                      <span className="flex items-center gap-1"><MapPin size={12}/> {p.cancha || 'Sin cancha'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 text-center sm:text-left font-semibold text-gray-700">
+                    {p.visitante?.nombre}
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center p-8 bg-white rounded-lg shadow-md text-gray-500">
+          <Calendar size={48} className="mx-auto text-gray-300 mb-2" />
+          Selecciona una etapa y una fecha para ver los partidos.
+        </div>
+      )}
 
-                <div className="flex items-center justify-center gap-6 my-2 md:my-0 flex-1">
-                  <div className="text-right font-bold text-gray-800 text-sm md:text-base flex-1">
-                    {p.equipo_local?.nombre || 'Equipo Local'}
-                  </div>
-
-                  <div className="bg-gray-100 px-4 py-1.5 rounded-lg font-mono font-bold text-sm text-gray-800 min-w-[70px] text-center">
-                    {p.estado === 'finalizado'
-                      ? `${p.goles_local ?? 0} - ${p.goles_visitante ?? 0}`
-                      : 'VS'}
-                  </div>
-
-                  <div className="text-left font-bold text-gray-800 text-sm md:text-base flex-1">
-                    {p.equipo_visitante?.nombre || 'Equipo Visitante'}
-                  </div>
+      {/* ================= MODAL ETAPA ================= */}
+      {modalEtapa && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <form onSubmit={crearEtapa} className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4">Nueva Etapa</h3>
+            <div className="space-y-3">
+              <input required type="text" placeholder="Nombre (Ej: Primera Etapa 2026)" className="w-full px-3 py-2 border rounded" value={formEtapa.nombre} onChange={e => setFormEtapa({...formEtapa, nombre: e.target.value})} />
+              <div className="grid grid-cols-2 gap-2">
+                <select className="w-full px-3 py-2 border rounded" value={formEtapa.disciplina} onChange={e => setFormEtapa({...formEtapa, disciplina: e.target.value})}>
+                  <option value="futbol">Fútbol</option>
+                  <option value="futsala">Futsala</option>
+                  <option value="ecuavoly">Ecuavoly</option>
+                </select>
+                <select className="w-full px-3 py-2 border rounded" value={formEtapa.categoria} onChange={e => setFormEtapa({...formEtapa, categoria: e.target.value})}>
+                  <option value="hombres">Hombres</option>
+                  <option value="mujeres">Mujeres</option>
+                  <option value="sub12">Sub-12</option>
+                  <option value="master40">Master 40</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-500">Inicio</label>
+                  <input required type="date" className="w-full px-3 py-2 border rounded" value={formEtapa.fecha_inicio} onChange={e => setFormEtapa({...formEtapa, fecha_inicio: e.target.value})} />
                 </div>
-
-                <div className="w-full md:w-auto text-right">
-                  {p.estado === 'finalizado' ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700">
-                      ✓ Finalizado
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700">
-                      ⏱ Programado
-                    </span>
-                  )}
+                <div>
+                  <label className="text-xs text-gray-500">Fin</label>
+                  <input required type="date" className="w-full px-3 py-2 border rounded" value={formEtapa.fecha_fin} onChange={e => setFormEtapa({...formEtapa, fecha_fin: e.target.value})} />
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button type="button" onClick={() => setModalEtapa(false)} className="flex-1 py-2 border rounded">Cancelar</button>
+              <button type="submit" className="flex-1 py-2 bg-liga-azul text-white rounded">Guardar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ================= MODAL FECHA ================= */}
+      {modalFecha && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <form onSubmit={crearFecha} className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-xl font-bold mb-4">Nueva Fecha (Jornada)</h3>
+            <div className="space-y-3">
+              <input required type="number" placeholder="Número de Fecha (Ej: 1)" className="w-full px-3 py-2 border rounded" value={formFecha.numero} onChange={e => setFormFecha({...formFecha, numero: e.target.value})} />
+              <div>
+                <label className="text-xs text-gray-500">Fecha Inicio</label>
+                <input required type="date" className="w-full px-3 py-2 border rounded" value={formFecha.fecha_inicio} onChange={e => setFormFecha({...formFecha, fecha_inicio: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Fecha Fin (Opcional)</label>
+                <input type="date" className="w-full px-3 py-2 border rounded" value={formFecha.fecha_fin} onChange={e => setFormFecha({...formFecha, fecha_fin: e.target.value})} />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button type="button" onClick={() => setModalFecha(false)} className="flex-1 py-2 border rounded">Cancelar</button>
+              <button type="submit" className="flex-1 py-2 bg-liga-azul text-white rounded">Guardar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ================= MODAL PARTIDO ================= */}
+      {modalPartido && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <form onSubmit={crearPartido} className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4">Programar Partido</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-600">Equipo Local</label>
+                <select required className="w-full px-3 py-2 border rounded" value={formPartido.equipo_local_id} onChange={e => setFormPartido({...formPartido, equipo_local_id: e.target.value})}>
+                  <option value="">Seleccione...</option>
+                  {equiposFiltrados.map(eq => <option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600">Equipo Visitante</label>
+                <select required className="w-full px-3 py-2 border rounded" value={formPartido.equipo_visitante_id} onChange={e => setFormPartido({...formPartido, equipo_visitante_id: e.target.value})}>
+                  <option value="">Seleccione...</option>
+                  {equiposFiltrados.map(eq => <option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-500">Hora</label>
+                  <input type="time" className="w-full px-3 py-2 border rounded" value={formPartido.hora} onChange={e => setFormPartido({...formPartido, hora: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">Cancha</label>
+                  <input type="text" placeholder="Ej: Estadio Central" className="w-full px-3 py-2 border rounded" value={formPartido.cancha} onChange={e => setFormPartido({...formPartido, cancha: e.target.value})} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600">Árbitro (Opcional)</label>
+                <select className="w-full px-3 py-2 border rounded" value={formPartido.arbitro_id} onChange={e => setFormPartido({...formPartido, arbitro_id: e.target.value})}>
+                  <option value="">Seleccione...</option>
+                  {arbitros.map(a => <option key={a.id} value={a.id}>{a.apellidos} {a.nombres}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button type="button" onClick={() => setModalPartido(false)} className="flex-1 py-2 border rounded">Cancelar</button>
+              <button type="submit" className="flex-1 py-2 bg-liga-rojo text-white rounded">Programar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
     </div>
   )
 }
