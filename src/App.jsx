@@ -14,6 +14,7 @@ import MiCarnet from './pages/MiCarnet'
 import MisJugadores from './pages/MisJugadores'
 import RegistroJugador from './pages/RegistroJugador'
 import MiClub from './pages/MiClub'
+import MiNomina from './pages/MiNomina'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
@@ -208,6 +209,17 @@ function App() {
           <ProtectedRoute rolesPermitidos={['delegado']}>
             <Layout>
               <MiClub />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mi-nomina"
+        element={
+          <ProtectedRoute rolesPermitidos={['delegado']}>
+            <Layout>
+              <MiNomina />
             </Layout>
           </ProtectedRoute>
         }
