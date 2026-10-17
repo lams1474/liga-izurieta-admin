@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { FileText, ArrowLeft, Users, CheckCircle, Save, AlertTriangle } from 'lucide-react'
+import { FileText, ArrowLeft, Users, CheckCircle, Save, AlertTriangle, Lock } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Actas() {
@@ -8,14 +8,11 @@ export default function Actas() {
   const [cargando, setCargando] = useState(true)
   const [partidoSeleccionado, setPartidoSeleccionado] = useState(null)
   
-  // Reglas de la disciplina (min_jugadores, max_acta)
   const [reglas, setReglas] = useState({ min_jugadores: 4, max_acta: 12 })
 
-  // Jugadores de la planilla
   const [jugadoresLocal, setJugadoresLocal] = useState([])
   const [jugadoresVisitante, setJugadoresVisitante] = useState([])
   
-  // Estado de la planilla (id_jugador: 'titular' | 'suplente')
   const [planilla, setPlanilla] = useState({})
   const [guardando, setGuardando] = useState(false)
 
@@ -48,7 +45,7 @@ export default function Actas() {
     setCargando(true)
 
     try {
-      // 1. Cargar reglas de la disciplina
+      // 1. Cargar reglas
       const { data: rule } = await supabase
         .from('reglas_disciplina')
         .select('min_jugadores, max_acta')
@@ -58,39 +55,34 @@ export default function Actas() {
       
       setReglas(rule || { min_jugadores: 4, max_acta: 12 })
 
-      // 2. Cargar jugadores del equipo local
+      // 2. Cargar jugadores CON EL ESTADO DEL CARNET (usando la vista)
       const { data: local } = await supabase
-        .from('jugador_equipo')
-        .select(`
-          dorsal,
-          jugador:jugadores!jugador_equipo_jugador_id_fkey (
-            id, apellidos, nombres, codigo_interno
-          )
-        `)
+        .from('vista_carnet_jugador')
+        .select('jugador_id, apellidos, nombres, codigo_interno, dorsal, estado_carnet, motivos_bloqueo')
         .eq('equipo_id', partido.local.id)
-        .eq('activo', true)
 
-      // 3. Cargar jugadores del equipo visitante
       const { data: visitante } = await supabase
-        .from('jugador_equipo')
-        .select(`
-          dorsal,
-          jugador:jugadores!jugador_equipo_jugador_id_fkey (
-            id, apellidos, nombres, codigo_interno
-          )
-        `)
+        .from('vista_carnet_jugador')
+        .select('jugador_id, apellidos, nombres, codigo_interno, dorsal, estado_carnet, motivos_bloqueo')
         .eq('equipo_id', partido.visitante.id)
-        .eq('activo', true)
 
-      // 4. Ver si ya existe una planilla guardada para este partido
+      // 3. Planilla existente
       const { data: planillaExistente } = await supabase
         .from('planilla_partido')
         .select('*')
         .eq('partido_id', partido.id)
 
+      // Formatear (adaptando los nombres de la vista)
       const formatList = (list) => (list || [])
-        .filter(i => i.jugador)
-        .map(i => ({ ...i.jugador, dorsal: i.dorsal }))
+        .map(j => ({
+          id: j.jugador_id, // La vista usa jugador_id
+          apellidos: j.apellidos,
+          nombres: j.nombres,
+          codigo_interno: j.codigo_interno,
+          dorsal: j.dorsal,
+          estado_carnet: j.estado_carnet,
+          motivos_bloqueo: j.motivos_bloqueo || []
+        }))
         .sort((a, b) => a.apellidos.localeCompare(b.apellidos))
 
       setJugadoresLocal(formatList(local))
@@ -112,12 +104,19 @@ export default function Actas() {
     }
   }
 
-  // Marcar/Desmarcar un jugador (con límite máximo en acta)
+  // Marcar/Desmarcar un jugador (con bloqueo de carnet)
   function toggleJugador(jugadorId, esLocal) {
+    const jugadoresEquipo = esLocal ? jugadoresLocal : jugadoresVisitante
+    const jugador = jugadoresEquipo.find(j => j.id === jugadorId)
+
+    // VALIDACIÓN: Si el carnet está bloqueado, no permitir
+    if (jugador.estado_carnet === 'BLOQUEADO') {
+      const motivos = jugador.motivos_bloqueo.join(' | ')
+      return toast.error(`No se puede convocar a ${jugador.apellidos}. Motivo: ${motivos}`, { duration: 5000 })
+    }
+
     setPlanilla(prev => {
       const actual = prev[jugadorId]
-
-      // Si ya está seleccionado, lo quitamos o cambiamos de estado
       if (actual) {
         if (actual === 'titular') return { ...prev, [jugadorId]: 'suplente' }
         const nuevo = { ...prev }
@@ -125,10 +124,7 @@ export default function Actas() {
         return nuevo
       }
 
-      // Si no está seleccionado, verificar el máximo en acta
-      const jugadoresEquipo = esLocal ? jugadoresLocal : jugadoresVisitante
       const seleccionadosEquipo = Object.keys(prev).filter(id => jugadoresEquipo.some(j => j.id === id)).length
-
       if (seleccionadosEquipo >= reglas.max_acta) {
         toast.error(`Máximo ${reglas.max_acta} jugadores por equipo en el acta.`)
         return prev
@@ -138,7 +134,7 @@ export default function Actas() {
     })
   }
 
-  // Guardar la planilla en Supabase
+  // Guardar la planilla
   async function guardarPlanilla() {
     if (!partidoSeleccionado) return
 
@@ -156,14 +152,12 @@ export default function Actas() {
       
       if (!window.confirm(msg)) return
 
-      // Calcular 3x0
       let gL = 0, gV = 0
       if (titularesLocal < min && titularesVisitante >= min) gV = 3
       if (titularesVisitante < min && titularesLocal >= min) gL = 3
 
       setGuardando(true)
       try {
-        // Guardar planilla de todos modos
         await supabase.from('planilla_partido').delete().eq('partido_id', partidoSeleccionado.id)
         const registros = Object.entries(planilla).map(([jugadorId, rol]) => {
           const esLocal = jugadoresLocal.some(j => j.id === jugadorId)
@@ -176,7 +170,6 @@ export default function Actas() {
         })
         if (registros.length > 0) await supabase.from('planilla_partido').insert(registros)
 
-        // Actualizar partido con 3x0
         await supabase.from('partidos').update({
           jugado: true, goles_local: gL, goles_visitante: gV,
           observaciones: 'Partido declarado No Presentado (3x0)'
@@ -185,18 +178,18 @@ export default function Actas() {
         toast.success('Partido registrado como No Presentado (3x0)')
         setPartidoSeleccionado(null)
       } catch (err) {
-        toast.error('Error al guardar')
+        console.error(err)
+        toast.error('Error al guardar el partido como No Presentado')
       } finally {
         setGuardando(false)
       }
       return
     }
 
-    // Guardado Normal (si cumple los mínimos)
+    // Guardado Normal
     setGuardando(true)
     try {
       await supabase.from('planilla_partido').delete().eq('partido_id', partidoSeleccionado.id)
-
       const registros = Object.entries(planilla).map(([jugadorId, rol]) => {
         const esLocal = jugadoresLocal.some(j => j.id === jugadorId)
         const equipoId = esLocal ? partidoSeleccionado.local.id : partidoSeleccionado.visitante.id
@@ -224,7 +217,6 @@ export default function Actas() {
   
   if (cargando && !partidoSeleccionado) return <div className="p-8 text-center">Cargando partidos...</div>
 
-  // VISTA 1: Lista de partidos
   if (!partidoSeleccionado) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -268,14 +260,11 @@ export default function Actas() {
     )
   }
 
-  // Calcular titulares actuales para mostrar en pantalla
   const titularesL = Object.entries(planilla).filter(([id, r]) => r === 'titular' && jugadoresLocal.some(j => j.id === id)).length
   const titularesV = Object.entries(planilla).filter(([id, r]) => r === 'titular' && jugadoresVisitante.some(j => j.id === id)).length
 
-  // VISTA 2: Armado de planilla
   return (
     <div className="max-w-6xl mx-auto pb-20">
-      {/* Header de la planilla */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6 flex items-center justify-between sticky top-0 z-10">
         <button onClick={() => setPartidoSeleccionado(null)} className="text-gray-500 hover:text-gray-800 flex items-center gap-1 font-semibold">
           <ArrowLeft size={18} /> Volver
@@ -291,7 +280,6 @@ export default function Actas() {
         </button>
       </div>
 
-      {/* Alerta si falta el mínimo */}
       {(titularesL < reglas.min_jugadores || titularesV < reglas.min_jugadores) && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded flex items-start gap-2">
           <AlertTriangle className="text-red-500 mt-0.5" size={20} />
@@ -304,14 +292,13 @@ export default function Actas() {
         </div>
       )}
 
-      {/* Leyenda */}
       <div className="flex gap-4 justify-center mb-6 text-sm">
         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-green-100 border border-green-500 rounded"></div> Titular</div>
         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-yellow-100 border border-yellow-500 rounded"></div> Suplente</div>
         <div className="flex items-center gap-2"><div className="w-4 h-4 bg-white border border-gray-300 rounded"></div> No convocado</div>
+        <div className="flex items-center gap-2"><Lock size={16} className="text-red-500" /> Carnet Bloqueado</div>
       </div>
 
-      {/* Canchas (Local y Visitante) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* EQUIPO LOCAL */}
@@ -325,17 +312,24 @@ export default function Actas() {
           <div className="divide-y divide-gray-100">
             {jugadoresLocal.map(j => {
               const estado = planilla[j.id]
+              const bloqueado = j.estado_carnet === 'BLOQUEADO'
+              
               return (
-                <div key={j.id} onClick={() => toggleJugador(j.id, true)} className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${estado === 'titular' ? 'bg-green-50' : estado === 'suplente' ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                <div key={j.id} onClick={() => toggleJugador(j.id, true)} className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${bloqueado ? 'bg-red-50 opacity-75 cursor-not-allowed' : estado === 'titular' ? 'bg-green-50' : estado === 'suplente' ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-600">{j.dorsal || '-'}</div>
                     <div>
                       <p className="font-semibold text-sm text-gray-800">{j.apellidos} {j.nombres}</p>
-                      <p className="text-xs text-gray-500">{j.codigo_interno}</p>
+                      {bloqueado ? (
+                        <p className="text-xs text-red-600 font-semibold">🔒 {j.motivos_bloqueo.join(', ')}</p>
+                      ) : (
+                        <p className="text-xs text-gray-500">{j.codigo_interno}</p>
+                      )}
                     </div>
                   </div>
-                  {estado === 'titular' && <CheckCircle className="text-green-500" size={20} />}
-                  {estado === 'suplente' && <CheckCircle className="text-yellow-500" size={20} />}
+                  {bloqueado && <Lock className="text-red-500" size={20} />}
+                  {!bloqueado && estado === 'titular' && <CheckCircle className="text-green-500" size={20} />}
+                  {!bloqueado && estado === 'suplente' && <CheckCircle className="text-yellow-500" size={20} />}
                 </div>
               )
             })}
@@ -353,17 +347,24 @@ export default function Actas() {
           <div className="divide-y divide-gray-100">
             {jugadoresVisitante.map(j => {
               const estado = planilla[j.id]
+              const bloqueado = j.estado_carnet === 'BLOQUEADO'
+              
               return (
-                <div key={j.id} onClick={() => toggleJugador(j.id, false)} className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${estado === 'titular' ? 'bg-green-50' : estado === 'suplente' ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                <div key={j.id} onClick={() => toggleJugador(j.id, false)} className={`p-3 flex items-center justify-between cursor-pointer transition-colors ${bloqueado ? 'bg-red-50 opacity-75 cursor-not-allowed' : estado === 'titular' ? 'bg-green-50' : estado === 'suplente' ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-600">{j.dorsal || '-'}</div>
                     <div>
                       <p className="font-semibold text-sm text-gray-800">{j.apellidos} {j.nombres}</p>
-                      <p className="text-xs text-gray-500">{j.codigo_interno}</p>
+                      {bloqueado ? (
+                        <p className="text-xs text-red-600 font-semibold">🔒 {j.motivos_bloqueo.join(', ')}</p>
+                      ) : (
+                        <p className="text-xs text-gray-500">{j.codigo_interno}</p>
+                      )}
                     </div>
                   </div>
-                  {estado === 'titular' && <CheckCircle className="text-green-500" size={20} />}
-                  {estado === 'suplente' && <CheckCircle className="text-yellow-500" size={20} />}
+                  {bloqueado && <Lock className="text-red-500" size={20} />}
+                  {!bloqueado && estado === 'titular' && <CheckCircle className="text-green-500" size={20} />}
+                  {!bloqueado && estado === 'suplente' && <CheckCircle className="text-yellow-500" size={20} />}
                 </div>
               )
             })}
