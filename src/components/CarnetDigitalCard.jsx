@@ -13,7 +13,7 @@ const CarnetDigitalCard = forwardRef(function CarnetDigitalCard({ jugador, equip
 
   // URL pública para el QR
   // Usamos el hash (#) para que no cause 404 en Vercel
-  const urlVerificacion = `https://web-liga-izurieta.vercel.app/#/verificar?cedula=${cedula}`
+  const urlVerificacion = `https://web-liga-izurieta.vercel.app/verificar?cedula=${cedula}`
 
   return (
     <div
