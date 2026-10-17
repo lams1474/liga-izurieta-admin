@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { Calendar, Plus, Clock, MapPin } from 'lucide-react'
+import { Calendar, Plus, Clock, MapPin, Pencil, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Calendario() {
@@ -24,6 +25,9 @@ export default function Calendario() {
   const [formEtapa, setFormEtapa] = useState({ nombre: '', disciplina: 'futbol', categoria: 'hombres', fecha_inicio: '', fecha_fin: '' })
   const [formFecha, setFormFecha] = useState({ numero: '', fecha_inicio: '', fecha_fin: '' })
   const [formPartido, setFormPartido] = useState({ hora: '', cancha: '', equipo_local_id: '', equipo_visitante_id: '', arbitro_id: '' })
+  
+  // Estado para saber si estamos editando un partido
+  const [partidoEditando, setPartidoEditando] = useState(null)
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -131,33 +135,67 @@ export default function Calendario() {
     setFormFecha({ numero: '', fecha_inicio: '', fecha_fin: '' })
   }
 
-  // === CREAR PARTIDO ===
-  async function crearPartido(e) {
+  // === GUARDAR PARTIDO (Crear o Editar) ===
+  async function guardarPartido(e) {
     e.preventDefault()
     if (!formPartido.equipo_local_id || !formPartido.equipo_visitante_id) return toast.error('Selecciona los equipos')
     if (formPartido.equipo_local_id === formPartido.equipo_visitante_id) return toast.error('Un equipo no puede jugar contra sí mismo')
 
-    const { data, error } = await supabase.from('partidos').insert({
-      fecha_id: fechaSeleccionada,
+    const payload = {
       hora: formPartido.hora || null,
       cancha: formPartido.cancha || null,
       equipo_local_id: formPartido.equipo_local_id,
       equipo_visitante_id: formPartido.equipo_visitante_id,
       arbitro_id: formPartido.arbitro_id || null,
-      jugado: false
-    }).select(`
-      id, hora, cancha, jugado, goles_local, goles_visitante,
-      local:equipos!partidos_equipo_local_id_fkey (id, nombre),
-      visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre),
-      arbitro:arbitros (id, nombres, apellidos)
-    `).single()
+    }
 
+    if (partidoEditando) {
+      // Actualizar partido existente
+      const { data, error } = await supabase.from('partidos').update(payload).eq('id', partidoEditando.id)
+        .select(`
+          id, hora, cancha, jugado, goles_local, goles_visitante,
+          local:equipos!partidos_equipo_local_id_fkey (id, nombre),
+          visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre),
+          arbitro:arbitros (id, nombres, apellidos)
+        `).single()
+
+      if (error) return toast.error(error.message)
+
+      toast.success('Partido actualizado')
+      setPartidos(partidos.map(p => p.id === data.id ? data : p).sort((a,b) => (a.hora || '').localeCompare(b.hora || '')))
+    } else {
+      // Crear nuevo partido
+      const { data, error } = await supabase.from('partidos').insert({
+        ...payload,
+        fecha_id: fechaSeleccionada,
+        jugado: false
+      }).select(`
+        id, hora, cancha, jugado, goles_local, goles_visitante,
+        local:equipos!partidos_equipo_local_id_fkey (id, nombre),
+        visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre),
+        arbitro:arbitros (id, nombres, apellidos)
+      `).single()
+
+      if (error) return toast.error(error.message)
+
+      toast.success('Partido programado')
+      setPartidos([...partidos, data].sort((a,b) => (a.hora || '').localeCompare(b.hora || '')))
+    }
+
+    setModalPartido(false)
+    setPartidoEditando(null)
+    setFormPartido({ hora: '', cancha: '', equipo_local_id: '', equipo_visitante_id: '', arbitro_id: '' })
+  }
+
+  // === ELIMINAR PARTIDO ===
+  async function eliminarPartido(id) {
+    if (!window.confirm('¿Estás seguro de eliminar este partido? Esta acción no se puede deshacer.')) return
+
+    const { error } = await supabase.from('partidos').delete().eq('id', id)
     if (error) return toast.error(error.message)
 
-    toast.success('Partido programado')
-    setPartidos([...partidos, data].sort((a,b) => (a.hora || '').localeCompare(b.hora || '')))
-    setModalPartido(false)
-    setFormPartido({ hora: '', cancha: '', equipo_local_id: '', equipo_visitante_id: '', arbitro_id: '' })
+    toast.success('Partido eliminado')
+    setPartidos(partidos.filter(p => p.id !== id))
   }
 
   // Filtrar equipos por la categoría/disciplina de la etapa seleccionada
@@ -231,7 +269,11 @@ export default function Calendario() {
           <div className="bg-liga-azul text-white p-4 flex justify-between items-center">
             <h3 className="font-bold">Partidos Programados</h3>
             <button
-              onClick={() => setModalPartido(true)}
+              onClick={() => {
+                setPartidoEditando(null)
+                setFormPartido({ hora: '', cancha: '', equipo_local_id: '', equipo_visitante_id: '', arbitro_id: '' })
+                setModalPartido(true)
+              }}
               className="bg-liga-rojo text-white px-3 py-1.5 rounded text-sm font-semibold hover:bg-liga-rojo/90 flex items-center gap-1"
             >
               <Plus size={16} /> Programar Partido
@@ -264,6 +306,34 @@ export default function Calendario() {
 
                   <div className="flex-1 text-center sm:text-left font-semibold text-gray-700">
                     {p.visitante?.nombre}
+                  </div>
+
+                  {/* BOTONES DE ACCIÓN */}
+                  <div className="flex items-center gap-1 sm:ml-4">
+                    <button
+                      onClick={() => {
+                        setPartidoEditando(p)
+                        setFormPartido({
+                          hora: p.hora || '',
+                          cancha: p.cancha || '',
+                          equipo_local_id: p.local?.id || '',
+                          equipo_visitante_id: p.visitante?.id || '',
+                          arbitro_id: p.arbitro?.id || ''
+                        })
+                        setModalPartido(true)
+                      }}
+                      className="p-2 text-blue-500 hover:bg-blue-50 rounded-md transition-colors"
+                      title="Editar partido"
+                    >
+                      <Pencil size={18} />
+                    </button>
+                    <button
+                      onClick={() => eliminarPartido(p.id)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                      title="Eliminar partido"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -340,24 +410,34 @@ export default function Calendario() {
         </div>
       )}
 
-      {/* ================= MODAL PARTIDO ================= */}
+      {/* ================= MODAL PARTIDO (CREAR / EDITAR) ================= */}
       {modalPartido && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <form onSubmit={crearPartido} className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold mb-4">Programar Partido</h3>
+          <form onSubmit={guardarPartido} className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4">
+              {partidoEditando ? 'Editar Partido' : 'Programar Partido'}
+            </h3>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-gray-600">Equipo Local</label>
                 <select required className="w-full px-3 py-2 border rounded" value={formPartido.equipo_local_id} onChange={e => setFormPartido({...formPartido, equipo_local_id: e.target.value})}>
                   <option value="">Seleccione...</option>
-                  {equiposFiltrados.map(eq => <option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
+                  {equiposFiltrados.map(eq => (
+                    <option key={eq.id} value={eq.id}>
+                      {eq.nombre} ({eq.categoria})
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-600">Equipo Visitante</label>
                 <select required className="w-full px-3 py-2 border rounded" value={formPartido.equipo_visitante_id} onChange={e => setFormPartido({...formPartido, equipo_visitante_id: e.target.value})}>
                   <option value="">Seleccione...</option>
-                  {equiposFiltrados.map(eq => <option key={eq.id} value={eq.id}>{eq.nombre}</option>)}
+                  {equiposFiltrados.map(eq => (
+                    <option key={eq.id} value={eq.id}>
+                      {eq.nombre} ({eq.categoria})
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -379,8 +459,19 @@ export default function Calendario() {
               </div>
             </div>
             <div className="flex gap-2 mt-6">
-              <button type="button" onClick={() => setModalPartido(false)} className="flex-1 py-2 border rounded">Cancelar</button>
-              <button type="submit" className="flex-1 py-2 bg-liga-rojo text-white rounded">Programar</button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  setModalPartido(false)
+                  setPartidoEditando(null)
+                }} 
+                className="flex-1 py-2 border rounded"
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="flex-1 py-2 bg-liga-azul text-white rounded">
+                {partidoEditando ? 'Guardar Cambios' : 'Programar'}
+              </button>
             </div>
           </form>
         </div>
