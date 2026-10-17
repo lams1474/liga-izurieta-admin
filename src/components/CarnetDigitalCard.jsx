@@ -1,7 +1,6 @@
 import { forwardRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import fondoCarnet from '../assets/carnet-fondo.png'
-import escudoLiga from '../assets/escudo-liga.png'
 
 const CarnetDigitalCard = forwardRef(function CarnetDigitalCard({ jugador, equipo, validacion }, ref) {
   if (!jugador) return null
@@ -126,10 +125,6 @@ const CarnetDigitalCard = forwardRef(function CarnetDigitalCard({ jugador, equip
             </div>
           )}
         </div>
-
-        {/* ESCUDO DE LA LIGA (Oculto o centrado si el fondo ya lo tiene, aquí lo dejamos oculto para no empastar) */}
-        {/* Si el fondo no tiene el escudo de la liga, puedes quitar el comentario de abajo */}
-        {/* <img src={escudoLiga} alt="Liga" className="absolute w-[1cm] h-[1cm] object-contain" style={{ top: '5%', right: '5%' }} crossOrigin="anonymous" /> */}
 
       </div>
     </div>
