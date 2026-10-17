@@ -25,10 +25,8 @@ export default function Actas() {
 
   const esCapitan = usuario?.rol === 'capitan'
 
-  // Cargar partidos
   useEffect(() => {
     async function cargarPartidos() {
-      // Si es capitán, buscamos partidos jugados que necesiten firma. Si no, los pendientes.
       let query = supabase.from('partidos').select(`
         id, hora, cancha, fecha_id, jugado, goles_local, goles_visitante,
         local:equipos!partidos_equipo_local_id_fkey (id, nombre, disciplina, categoria),
@@ -38,7 +36,6 @@ export default function Actas() {
       `)
 
       if (esCapitan) {
-        // Si es capitán, ve los que están en estado 'firmando'
         query = query.eq('jugado', true)
       } else {
         query = query.eq('jugado', false)
@@ -63,17 +60,47 @@ export default function Actas() {
       const { data: rule } = await supabase.from('reglas_disciplina').select('min_jugadores, max_acta').eq('disciplina', partido.local.disciplina).eq('categoria', partido.local.categoria).single()
       setReglas(rule || { min_jugadores: 4, max_acta: 12 })
 
-      const { data: local } = await supabase.from('vista_carnet_jugador').select('jugador_id, apellidos, nombres, codigo_interno, dorsal, estado_carnet, motivos_bloqueo').eq('equipo_id', partido.local.id)
-      const { data: visitante } = await supabase.from('vista_carnet_jugador').select('jugador_id, apellidos, nombres, codigo_interno, dorsal, estado_carnet, motivos_bloqueo').eq('equipo_id', partido.visitante.id)
+      // Función auxiliar para cargar y validar jugadores
+      const cargarJugadores = async (equipoId) => {
+        const { data: inscripciones, error } = await supabase
+          .from('jugador_equipo')
+          .select(`
+            dorsal,
+            jugador:jugadores!jugador_equipo_jugador_id_fkey (
+              id, apellidos, nombres, codigo_interno
+            )
+          `)
+          .eq('equipo_id', equipoId)
+          .eq('activo', true)
+
+        if (error) throw error
+
+        // Validar carnet de cada jugador
+        const promesas = (inscripciones || []).filter(i => i.jugador).map(async (i) => {
+          const j = i.jugador
+          const { data: val } = await supabase.rpc('validar_carnet', {
+            p_jugador_id: j.id,
+            p_equipo_id: equipoId
+          })
+          return {
+            id: j.id, apellidos: j.apellidos, nombres: j.nombres, codigo_interno: j.codigo_interno,
+            dorsal: i.dorsal,
+            estado_carnet: val?.[0]?.estado || 'HABILITADO',
+            motivos_bloqueo: val?.[0]?.motivos || []
+          }
+        })
+
+        const jugadoresValidos = await Promise.all(promesas)
+        return jugadoresValidos.sort((a, b) => a.apellidos.localeCompare(b.apellidos))
+      }
+
+      const local = await cargarJugadores(partido.local.id)
+      const visitante = await cargarJugadores(partido.visitante.id)
+
+      setJugadoresLocal(local)
+      setJugadoresVisitante(visitante)
+
       const { data: planillaExistente } = await supabase.from('planilla_partido').select('*').eq('partido_id', partido.id)
-
-      const formatList = (list) => (list || []).map(j => ({
-        id: j.jugador_id, apellidos: j.apellidos, nombres: j.nombres, codigo_interno: j.codigo_interno,
-        dorsal: j.dorsal, estado_carnet: j.estado_carnet, motivos_bloqueo: j.motivos_bloqueo || []
-      })).sort((a, b) => a.apellidos.localeCompare(b.apellidos))
-
-      setJugadoresLocal(formatList(local))
-      setJugadoresVisitante(formatList(visitante))
 
       if (planillaExistente && planillaExistente.length > 0) {
         const planillaCargada = {}
@@ -81,7 +108,6 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
-      // Cargar eventos (goles y tarjetas)
       const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(apellidos, nombres)').eq('partido_id', partido.id)
       const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(apellidos, nombres)').eq('partido_id', partido.id)
       
@@ -100,7 +126,7 @@ export default function Actas() {
 
     } catch (err) {
       console.error(err)
-      toast.error('Error al cargar')
+      toast.error('Error al cargar los jugadores del partido')
     } finally {
       setCargando(false)
     }
@@ -206,10 +232,8 @@ export default function Actas() {
     if (!window.confirm('¿Finalizar el partido? Se enviará a los capitanes para su firma.')) return
     setGuardando(true)
     try {
-      // 1. Marcar partido como jugado
       await supabase.from('partidos').update({ jugado: true }).eq('id', partidoSeleccionado.id)
       
-      // 2. Crear el acta en estado "firmando"
       let actaId = partidoSeleccionado.acta?.[0]?.id
       if (!actaId) {
         const { data: nuevaActa } = await supabase.from('actas').insert({
@@ -218,7 +242,6 @@ export default function Actas() {
         actaId = nuevaActa.id
       }
 
-      // 3. Firmar automáticamente como árbitro/vocal (quien esté logueado)
       const tipoFirmante = usuario.rol === 'arbitro' ? 'arbitro' : 'vocal'
       await supabase.from('firmas_acta').insert({
         acta_id: actaId, firmante_tipo: tipoFirmante, firmante_id: usuario.id
@@ -240,7 +263,6 @@ export default function Actas() {
       let actaId = partidoSeleccionado.acta?.[0]?.id
       if (!actaId) throw new Error('No se encontró el acta')
 
-      // Determinar si el capitán es local o visitante
       const esLocal = usuario.club_id === partidoSeleccionado.local.id
       const esVisitante = usuario.club_id === partidoSeleccionado.visitante.id
 
@@ -262,10 +284,8 @@ export default function Actas() {
     }
   }
 
-  // ============ RENDER ============
   if (cargando && vista === 'lista') return <div className="p-8 text-center">Cargando...</div>
 
-  // --- VISTA 1: LISTA DE PARTIDOS ---
   if (vista === 'lista') {
     return (
       <div className="max-w-4xl mx-auto">
@@ -285,7 +305,7 @@ export default function Actas() {
           <div className="space-y-3">
             {partidos.map(p => {
               const actaCerrada = p.acta?.[0]?.estado === 'cerrada'
-              if (esCapitan && actaCerrada) return null // El capitán no ve las cerradas
+              if (esCapitan && actaCerrada) return null
 
               return (
                 <div key={p.id} className="bg-white rounded-lg shadow-md p-4 flex flex-col sm:flex-row items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => seleccionarPartido(p)}>
@@ -311,7 +331,6 @@ export default function Actas() {
     )
   }
 
-  // --- VISTA: FIRMAR ACTA (Solo Capitanes) ---
   if (vista === 'firmar_acta') {
     return (
       <div className="max-w-2xl mx-auto pb-20">
@@ -345,7 +364,6 @@ export default function Actas() {
     )
   }
 
-  // --- VISTA 2: ARMAR PLANILLA (Vocal/Arbitro/Admin) ---
   if (vista === 'planilla') {
     const titularesL = Object.entries(planilla).filter(([id, r]) => r === 'titular' && jugadoresLocal.some(j => j.id === id)).length
     const titularesV = Object.entries(planilla).filter(([id, r]) => r === 'titular' && jugadoresVisitante.some(j => j.id === id)).length
@@ -413,7 +431,6 @@ export default function Actas() {
     )
   }
 
-  // --- VISTA 3: PARTIDO EN CURSO (Vocal/Arbitro) ---
   return (
     <div className="max-w-4xl mx-auto pb-20">
       <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
