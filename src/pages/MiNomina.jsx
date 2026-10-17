@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { FileSpreadsheet, FileText, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable' // <-- CAMBIO AQUÍ (Importación directa)
 import toast from 'react-hot-toast'
 
 export default function MiNomina() {
@@ -104,13 +104,13 @@ export default function MiNomina() {
       const libro = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(libro, hoja, 'Nómina')
       
-      // Ajustar ancho de columnas (opcional)
       hoja['!cols'] = [
         { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 8 },
         { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 20 }
       ]
 
-      XLSX.writeFile(libro, `Nomina_${club?.nombre.replace(/\s+/g, '_')}.xlsx`)
+      const nombreClub = club?.nombre ? club.nombre.replace(/\s+/g, '_') : 'Liga'
+      XLSX.writeFile(libro, `Nomina_${nombreClub}.xlsx`)
       toast.success('Excel descargado')
     } catch (err) {
       console.error(err)
@@ -123,18 +123,22 @@ export default function MiNomina() {
     try {
       const doc = new jsPDF()
       
+      const nombreClub = club?.nombre || 'CLUB'
+      const disciplina = club?.disciplina ? club.disciplina.toUpperCase() : 'N/A'
+      const categoria = club?.categoria ? club.categoria.toUpperCase() : 'N/A'
+
       // Encabezado
-      doc.setFontSize(18)
+      doc.setFontSize(16)
       doc.setTextColor(30, 58, 138) // Azul liga
-      doc.text('LIGA DEPORTIVA BARRIAL JOSÉ IGNACIO IZURIETA', 14, 20)
+      doc.text('LIGA DEPORTIVA BARRIAL JOSE IGNACIO IZURIETA', 14, 20)
       
       doc.setFontSize(14)
       doc.setTextColor(0, 0, 0)
-      doc.text(`NÓMINA DE JUGADORES - ${club?.nombre}`, 14, 30)
+      doc.text(`NOMINA DE JUGADORES - ${nombreClub}`, 14, 30)
       
       doc.setFontSize(10)
-      doc.text(`Disciplina: ${club?.disciplina.toUpperCase()} | Categoría: ${club?.categoria.toUpperCase()}`, 14, 37)
-      doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-EC')}`, 14, 43)
+      doc.text(`Disciplina: ${disciplina} | Categoria: ${categoria}`, 14, 37)
+      doc.text(`Fecha de emision: ${new Date().toLocaleDateString('es-EC')}`, 14, 43)
 
       // Tabla
       const filas = jugadores.map(j => [
@@ -145,7 +149,8 @@ export default function MiNomina() {
         obtenerEstado(j)
       ])
 
-      doc.autoTable({
+      // USO CORRECTO DE AUTOTABLE EN VERSIONES NUEVAS
+      autoTable(doc, {
         startY: 50,
         head: [['Dorsal', 'Código', 'Jugador', 'Cédula', 'Estado']],
         body: filas,
@@ -161,7 +166,7 @@ export default function MiNomina() {
         }
       })
 
-      doc.save(`Nomina_${club?.nombre.replace(/\s+/g, '_')}.pdf`)
+      doc.save(`Nomina_${nombreClub.replace(/\s+/g, '_')}.pdf`)
       toast.success('PDF descargado')
     } catch (err) {
       console.error(err)
