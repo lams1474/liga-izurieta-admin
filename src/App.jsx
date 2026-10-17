@@ -13,6 +13,7 @@ import Reportes from './pages/Reportes'
 import MiCarnet from './pages/MiCarnet'
 import MisJugadores from './pages/MisJugadores'
 import RegistroJugador from './pages/RegistroJugador'
+import MiClub from './pages/MiClub'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
@@ -189,12 +190,24 @@ function App() {
         }
       />
 
+      {/* Rutas del Presidente */}
       <Route
         path="/mis-jugadores"
         element={
           <ProtectedRoute rolesPermitidos={['delegado']}>
             <Layout>
               <MisJugadores />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mi-club"
+        element={
+          <ProtectedRoute rolesPermitidos={['delegado']}>
+            <Layout>
+              <MiClub />
             </Layout>
           </ProtectedRoute>
         }
