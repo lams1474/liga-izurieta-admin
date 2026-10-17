@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Calendar, Plus, Clock, MapPin, Pencil, Trash2 } from 'lucide-react'
