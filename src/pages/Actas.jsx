@@ -61,25 +61,11 @@ export default function Actas() {
     setCargando(true)
 
     try {
+      // 1. Cargar reglas
       const { data: rule } = await supabase.from('reglas_disciplina').select('min_jugadores, max_acta').eq('disciplina', partido.local.disciplina).eq('categoria', partido.local.categoria).single()
       setReglas(rule || { min_jugadores: 4, max_acta: 12 })
 
-      // Cargar eventos guardando también el ID del jugador
-      const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
-      const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
-      
-      let evs = []
-      if (goles) goles.forEach(g => evs.push({ tipo: 'gol', jugador_id: g.jugador.id, jugador: `${g.jugador.apellidos} ${g.jugador.nombres}`, equipo_id: null }))
-      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador_id: t.jugador.id, jugador: `${t.jugador.apellidos} ${t.jugador.nombres}`, equipo_id: t.equipo.id }))
-      setEventos(evs)
-      setMarcador({ local: partido.goles_local || 0, visitante: partido.goles_visitante || 0 })
-
-      if (pestana === 'historial' || esCapitan) {
-        setVista(pestana === 'historial' ? 'ver_acta' : 'firmar_acta')
-        setCargando(false)
-        return
-      }
-
+      // 2. Cargar jugadores de AMBOS equipos (SIEMPRE, para que el PDF funcione)
       const cargarJugadores = async (equipoId) => {
         const { data: inscripciones } = await supabase.from('jugador_equipo').select(`dorsal, jugador:jugadores!jugador_equipo_jugador_id_fkey (id, apellidos, nombres, codigo_interno)`).eq('equipo_id', equipoId).eq('activo', true)
         const promesas = (inscripciones || []).filter(i => i.jugador).map(async (i) => {
@@ -92,6 +78,7 @@ export default function Actas() {
       setJugadoresLocal(await cargarJugadores(partido.local.id))
       setJugadoresVisitante(await cargarJugadores(partido.visitante.id))
 
+      // 3. Cargar la planilla guardada (SIEMPRE)
       const { data: planillaExistente } = await supabase.from('planilla_partido').select('*').eq('partido_id', partido.id)
       if (planillaExistente && planillaExistente.length > 0) {
         const planillaCargada = {}
@@ -99,7 +86,21 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
-      setVista('planilla')
+      // 4. Cargar eventos (goles y tarjetas) con IDs
+      const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
+      const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
+      
+      let evs = []
+      if (goles) goles.forEach(g => evs.push({ tipo: 'gol', jugador_id: g.jugador.id, jugador: `${g.jugador.apellidos} ${g.jugador.nombres}`, equipo_id: null }))
+      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador_id: t.jugador.id, jugador: `${t.jugador.apellidos} ${t.jugador.nombres}`, equipo_id: t.equipo.id }))
+      setEventos(evs)
+      setMarcador({ local: partido.goles_local || 0, visitante: partido.goles_visitante || 0 })
+
+      // 5. Decidir qué pantalla mostrar
+      if (pestana === 'historial') setVista('ver_acta')
+      else if (esCapitan) setVista('firmar_acta')
+      else setVista('planilla')
+
     } catch (err) {
       console.error(err)
       toast.error('Error al cargar datos')
@@ -118,14 +119,12 @@ export default function Actas() {
         doc.setFont("helvetica", "bold")
         doc.setFontSize(14)
         doc.text('LIGA DEPORTIVA BARRIAL JOSE I. IZURIETA', 105, 15, { align: 'center' })
-        
         doc.setFontSize(9)
         doc.setFont("helvetica", "normal")
         doc.text('PUJILI - ECUADOR', 105, 20, { align: 'center' })
         doc.text('FUNDADA EL 09 DE MARZO DEL 2013', 20, 26)
         doc.text('ACUERDO MUNICIPAL NO. 034-GADMP-2013', 130, 26)
         doc.line(15, 28, 195, 28)
-        
         doc.setFont("helvetica", "bold")
         doc.setFontSize(12)
         doc.text(`ACTA DE JUEGO - PÁGINA ${pagina}`, 105, 35, { align: 'center' })
@@ -149,7 +148,7 @@ export default function Actas() {
       doc.text(`CATEGORÍA: ${p.local.categoria.toUpperCase()}`, 100, 60)
 
       const filasLocal = jugadoresLocal
-        .filter(j => planilla[j.id]) 
+        .filter(j => planilla[j.id]) // Solo los que están en la planilla
         .map(j => {
           const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
           const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
