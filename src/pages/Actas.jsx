@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { FileText, ArrowLeft, Users, CheckCircle, AlertTriangle, Lock, Target, StopCircle, PenTool, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export default function Actas() {
   const { usuario } = useAuth()
@@ -63,17 +64,18 @@ export default function Actas() {
       const { data: rule } = await supabase.from('reglas_disciplina').select('min_jugadores, max_acta').eq('disciplina', partido.local.disciplina).eq('categoria', partido.local.categoria).single()
       setReglas(rule || { min_jugadores: 4, max_acta: 12 })
 
-      const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(apellidos, nombres, cedula)').eq('partido_id', partido.id)
-      const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(apellidos, nombres, cedula), equipo:equipos(id)').eq('partido_id', partido.id)
+      // Cargar eventos guardando también el ID del jugador
+      const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
+      const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
       
       let evs = []
-      if (goles) goles.forEach(g => evs.push({ tipo: 'gol', jugador: g.jugador.apellidos, cedula: g.jugador.cedula, equipo_id: null }))
-      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador: t.jugador.apellidos, cedula: t.jugador.cedula, equipo_id: t.equipo.id }))
+      if (goles) goles.forEach(g => evs.push({ tipo: 'gol', jugador_id: g.jugador.id, jugador: `${g.jugador.apellidos} ${g.jugador.nombres}`, equipo_id: null }))
+      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador_id: t.jugador.id, jugador: `${t.jugador.apellidos} ${t.jugador.nombres}`, equipo_id: t.equipo.id }))
       setEventos(evs)
       setMarcador({ local: partido.goles_local || 0, visitante: partido.goles_visitante || 0 })
 
-      if (pestana === 'historial') {
-        setVista('ver_acta')
+      if (pestana === 'historial' || esCapitan) {
+        setVista(pestana === 'historial' ? 'ver_acta' : 'firmar_acta')
         setCargando(false)
         return
       }
@@ -97,7 +99,7 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
-      setVista(esCapitan ? 'firmar_acta' : 'planilla')
+      setVista('planilla')
     } catch (err) {
       console.error(err)
       toast.error('Error al cargar datos')
@@ -106,136 +108,204 @@ export default function Actas() {
     }
   }
 
-  // ============ GENERAR PDF OFICIAL ============
+  // ============ GENERAR PDF OFICIAL DE 2 PÁGINAS ============
   function descargarPDF() {
     try {
       const doc = new jsPDF()
       const p = partidoSeleccionado
       
-      // Colores y fuentes
-      doc.setTextColor(0, 0, 0)
-      
-      // --- ENCABEZADO OFICIAL ---
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(16)
-      doc.text('LIGA DEPORTIVA BARRIAL JOSE I. IZURIETA', 105, 20, { align: 'center' })
-      
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-      doc.text('PUJILI - ECUADOR', 105, 26, { align: 'center' })
-      doc.text('FUNDADA EL 09 DE MARZO DEL 2013', 20, 33)
-      doc.text('ACUERDO MUNICIPAL NO. 034-GADMP-2013', 130, 33)
-      
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(14)
-      doc.text('ACTA DE JUEGO', 105, 45, { align: 'center' })
+      const dibujarEncabezado = (pagina) => {
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(14)
+        doc.text('LIGA DEPORTIVA BARRIAL JOSE I. IZURIETA', 105, 15, { align: 'center' })
+        
+        doc.setFontSize(9)
+        doc.setFont("helvetica", "normal")
+        doc.text('PUJILI - ECUADOR', 105, 20, { align: 'center' })
+        doc.text('FUNDADA EL 09 DE MARZO DEL 2013', 20, 26)
+        doc.text('ACUERDO MUNICIPAL NO. 034-GADMP-2013', 130, 26)
+        doc.line(15, 28, 195, 28)
+        
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(12)
+        doc.text(`ACTA DE JUEGO - PÁGINA ${pagina}`, 105, 35, { align: 'center' })
+      }
 
-      // --- DATOS DEL PARTIDO ---
-      doc.setFontSize(10)
+      // ==================== PÁGINA 1: PLANILLA DE JUGADORES ====================
+      dibujarEncabezado(1)
+
+      doc.setFontSize(9)
+      doc.setFont("helvetica", "normal")
+      
+      const fechaStr = new Date(p.fecha_inicio || Date.now()).toLocaleDateString()
+      doc.text(`VOCAL DE TURNO: ____________________`, 15, 45)
+      doc.text(`CIUDAD: Pujilí`, 100, 45)
+      doc.text(`FECHA: ${fechaStr}`, 145, 45)
+      doc.text(`HORA: ${p.hora?.slice(0,5) || '________'}`, 15, 51)
+
+      // TABLA EQUIPO LOCAL
+      doc.setFont("helvetica", "bold")
+      doc.text(`CLUB: ${p.local.nombre.toUpperCase()}`, 15, 60)
+      doc.text(`CATEGORÍA: ${p.local.categoria.toUpperCase()}`, 100, 60)
+
+      const filasLocal = jugadoresLocal
+        .filter(j => planilla[j.id]) 
+        .map(j => {
+          const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
+          const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
+          const rojas = eventos.filter(e => e.tipo === 'roja' && e.jugador_id === j.id).length
+          return [
+            j.dorsal || '-',
+            `${j.apellidos} ${j.nombres}`,
+            goles > 0 ? goles.toString() : '',
+            amarillas > 0 ? 'X' : '',
+            rojas > 0 ? 'X' : ''
+          ]
+        })
+
+      autoTable(doc, {
+        startY: 63,
+        head: [['NO.', 'NOMBRES DE JUGADORES', 'GOL', 'T.A.', 'T.R.']],
+        body: filasLocal,
+        theme: 'grid',
+        headStyles: { fillColor: [200, 200, 200], textColor: [0,0,0], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 1.5 },
+        columnStyles: {
+          0: { cellWidth: 15, halign: 'center' },
+          1: { cellWidth: 110 },
+          2: { cellWidth: 15, halign: 'center' },
+          3: { cellWidth: 15, halign: 'center' },
+          4: { cellWidth: 15, halign: 'center' }
+        }
+      })
+
+      // TABLA EQUIPO VISITANTE
+      let finalY = doc.lastAutoTable.finalY + 10
+      doc.setFont("helvetica", "bold")
+      doc.text(`CLUB: ${p.visitante.nombre.toUpperCase()}`, 15, finalY)
+      doc.text(`CATEGORÍA: ${p.visitante.categoria?.toUpperCase() || ''}`, 100, finalY)
+
+      const filasVisitante = jugadoresVisitante
+        .filter(j => planilla[j.id])
+        .map(j => {
+          const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
+          const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
+          const rojas = eventos.filter(e => e.tipo === 'roja' && e.jugador_id === j.id).length
+          return [
+            j.dorsal || '-',
+            `${j.apellidos} ${j.nombres}`,
+            goles > 0 ? goles.toString() : '',
+            amarillas > 0 ? 'X' : '',
+            rojas > 0 ? 'X' : ''
+          ]
+        })
+
+      autoTable(doc, {
+        startY: finalY + 3,
+        head: [['NO.', 'NOMBRES DE JUGADORES', 'GOL', 'T.A.', 'T.R.']],
+        body: filasVisitante,
+        theme: 'grid',
+        headStyles: { fillColor: [200, 200, 200], textColor: [0,0,0], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 1.5 },
+        columnStyles: {
+          0: { cellWidth: 15, halign: 'center' },
+          1: { cellWidth: 110 },
+          2: { cellWidth: 15, halign: 'center' },
+          3: { cellWidth: 15, halign: 'center' },
+          4: { cellWidth: 15, halign: 'center' }
+        }
+      })
+
+      // ==================== PÁGINA 2: TARJETAS, NOVEDADES Y FIRMAS ====================
+      doc.addPage()
+      dibujarEncabezado(2)
+
+      doc.setFontSize(9)
       doc.setFont("helvetica", "normal")
       
       const nombreArbitro = p.arbitro ? `${p.arbitro.nombres} ${p.arbitro.apellidos}` : '________________________'
-      doc.text(`NOMBRE DEL SR. ARBITRO: ${nombreArbitro}`, 20, 55)
-      
-      const fechaStr = new Date(p.fecha_inicio || Date.now()).toLocaleDateString()
-      doc.text(`FECHA: ${fechaStr}`, 20, 61)
-      doc.text(`CANCHA: ${p.cancha || '_____________'}`, 100, 61)
-      doc.text(`HORA: ${p.hora?.slice(0,5) || '________'}`, 160, 61)
+      doc.text(`NOMBRE DEL SR. ARBITRO: ${nombreArbitro}`, 15, 45)
 
-      // --- TARJETAS CLUB LOCAL ---
       const tarjetasLocal = eventos.filter(ev => (ev.tipo === 'amarilla' || ev.tipo === 'roja') && ev.equipo_id === p.local.id)
       const tarjetasVisitante = eventos.filter(ev => (ev.tipo === 'amarilla' || ev.tipo === 'roja') && ev.equipo_id === p.visitante.id)
 
       const dibujarSeccionTarjetas = (startY, nombreClub, tarjetas) => {
         doc.setFont("helvetica", "bold")
-        doc.text(`TARJETAS DEL CLUB: ${nombreClub.toUpperCase()}`, 20, startY)
+        doc.text(`TARJETAS DEL CLUB: ${nombreClub.toUpperCase()}`, 15, startY)
         
-        let yAmarillas = startY + 10
-        let yRojas = startY + 55
+        let yAmarillas = startY + 6
+        let yRojas = startY + 45
 
-        // Amarillas
-        doc.setFont("helvetica", "bold")
-        doc.text('TARJETAS AMARILLAS:', 20, yAmarillas)
+        doc.text('TARJETAS AMARILLAS:', 15, yAmarillas)
         doc.setFont("helvetica", "normal")
-        yAmarillas += 6
-        
+        yAmarillas += 5
         const amarillas = tarjetas.filter(t => t.tipo === 'amarilla')
         for(let i=0; i<6; i++) {
-          doc.text(`NO. ______`, 20, yAmarillas + (i*7))
-          doc.line(45, yAmarillas + (i*7), 140, yAmarillas + (i*7))
-          if (amarillas[i]) doc.text(amarillas[i].jugador, 47, yAmarillas + (i*7) - 1)
-          doc.text(`POR: ______________`, 145, yAmarillas + (i*7))
+          doc.text(`NO. ______`, 15, yAmarillas + (i*6))
+          doc.line(35, yAmarillas + (i*6), 130, yAmarillas + (i*6))
+          if (amarillas[i]) doc.text(amarillas[i].jugador, 37, yAmarillas + (i*6) - 1)
+          doc.text(`POR: ________________`, 135, yAmarillas + (i*6))
         }
 
-        // Rojas
         doc.setFont("helvetica", "bold")
-        doc.text('TARJETAS ROJAS:', 20, yRojas)
+        doc.text('TARJETAS ROJAS:', 15, yRojas)
         doc.setFont("helvetica", "normal")
-        yRojas += 6
-        
+        yRojas += 5
         const rojas = tarjetas.filter(t => t.tipo === 'roja')
         for(let i=0; i<4; i++) {
-          doc.text(`NO. ______`, 20, yRojas + (i*7))
-          doc.line(45, yRojas + (i*7), 140, yRojas + (i*7))
-          if (rojas[i]) doc.text(rojas[i].jugador, 47, yRojas + (i*7) - 1)
-          doc.text(`POR: ______________`, 145, yRojas + (i*7))
+          doc.text(`NO. ______`, 15, yRojas + (i*6))
+          doc.line(35, yRojas + (i*6), 130, yRojas + (i*6))
+          if (rojas[i]) doc.text(rojas[i].jugador, 37, yRojas + (i*6) - 1)
+          doc.text(`POR: ________________`, 135, yRojas + (i*6))
         }
-
-        return yRojas + 35 // Retornar la siguiente coordenada Y
+        return yRojas + 30
       }
 
-      let nextY = dibujarSeccionTarjetas(70, p.local.nombre, tarjetasLocal)
+      let nextY = dibujarSeccionTarjetas(55, p.local.nombre, tarjetasLocal)
       nextY = dibujarSeccionTarjetas(nextY, p.visitante.nombre, tarjetasVisitante)
 
-      // --- NOVEDADES ---
       doc.setFont("helvetica", "bold")
-      doc.text('NOVEDADES:', 20, nextY)
+      doc.text('NOVEDADES:', 15, nextY)
       doc.setFont("helvetica", "normal")
+      const splitText = doc.splitTextToSize(novedades || 'Sin novedades registradas.', 175)
+      doc.text(splitText, 15, nextY + 6)
       
-      // Caja de texto para novedades
-      const splitText = doc.splitTextToSize(novedades || 'Sin novedades registradas.', 170)
-      doc.text(splitText, 20, nextY + 6)
-      
-      // Líneas para simular el formulario físico debajo del texto
       let lineY = nextY + 6 + (splitText.length * 5) + 5
       for(let i=0; i<4; i++) {
-        doc.line(20, lineY + (i*8), 190, lineY + (i*8))
+        doc.line(15, lineY + (i*8), 195, lineY + (i*8))
       }
 
-      // --- FIRMAS ---
-      const firmaY = lineY + 45
-      doc.line(80, firmaY, 130, firmaY)
+      const firmaY = Math.min(lineY + 40, 240)
+      doc.line(75, firmaY, 135, firmaY)
       doc.setFont("helvetica", "bold")
       doc.text('FIRMA DEL SR. ÁRBITRO', 105, firmaY + 5, { align: 'center' })
 
       doc.setFont("helvetica", "normal")
-      doc.text('Acta aprobada el día: _____________________', 20, firmaY + 15)
+      doc.text('Acta aprobada el día: _____________________', 15, firmaY + 15)
 
       const firmaY2 = firmaY + 25
-      doc.line(20, firmaY2, 60, firmaY2)
-      doc.line(80, firmaY2, 120, firmaY2)
-      doc.line(140, firmaY2, 180, firmaY2)
+      doc.line(15, firmaY2, 60, firmaY2)
+      doc.line(75, firmaY2, 120, firmaY2)
+      doc.line(135, firmaY2, 180, firmaY2)
       
       doc.setFont("helvetica", "bold")
       doc.setFontSize(8)
-      doc.text('FIRMA PRESIDENTE C.D.LDBJII', 40, firmaY2 + 4, { align: 'center' })
-      doc.text('FIRMA SECRETARIO C.D.LDBJII', 100, firmaY2 + 4, { align: 'center' })
-      doc.text('FIRMA VOCAL C.D.LDBJII', 160, firmaY2 + 4, { align: 'center' })
+      doc.text('FIRMA PRESIDENTE C.D.LDBJII', 37, firmaY2 + 4, { align: 'center' })
+      doc.text('FIRMA SECRETARIO C.D.LDBJII', 97, firmaY2 + 4, { align: 'center' })
+      doc.text('FIRMA VOCAL C.D.LDBJII', 157, firmaY2 + 4, { align: 'center' })
 
-      // --- PIE DE PÁGINA ---
-      doc.setFontSize(9)
-      doc.text('VIVE EL FUTBOL SIN DROGAS Y SIN ALCOHOL', 20, 285)
+      doc.setFontSize(8)
+      doc.text('VIVE EL FUTBOL SIN DROGAS Y SIN ALCOHOL', 15, 285)
       doc.text('CAMPEONATO 2026', 170, 285)
 
       doc.save(`Acta_Oficial_${p.local?.nombre}_vs_${p.visitante?.nombre}.pdf`)
-      toast.success('PDF Oficial descargado')
+      toast.success('PDF Oficial de 2 páginas descargado')
     } catch (err) {
       console.error(err)
       toast.error('Error al generar PDF')
     }
   }
 
-  // --- Funciones de estado (Planilla, Goles, Tarjetas, Finalizar) ---
   function toggleJugador(jugadorId, esLocal) {
     const jugadoresEquipo = esLocal ? jugadoresLocal : jugadoresVisitante
     const jugador = jugadoresEquipo.find(j => j.id === jugadorId)
@@ -295,12 +365,11 @@ export default function Actas() {
       toast.success('Registrado')
       setModalAccion(null)
       
-      // Recargar eventos
-      const { data: g } = await supabase.from('goles').select('*, jugador:jugadores(apellidos, cedula)').eq('partido_id', partidoSeleccionado.id)
-      const { data: t } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(apellidos, cedula), equipo:equipos(id)').eq('partido_id', partidoSeleccionado.id)
+      const { data: g } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partidoSeleccionado.id)
+      const { data: t } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partidoSeleccionado.id)
       let evs = []
-      if (g) g.forEach(x => evs.push({ tipo: 'gol', jugador: x.jugador.apellidos, cedula: x.jugador.cedula, equipo_id: null }))
-      if (t) t.forEach(x => evs.push({ tipo: x.tipo, jugador: x.jugador.apellidos, cedula: x.jugador.cedula, equipo_id: x.equipo.id }))
+      if (g) g.forEach(x => evs.push({ tipo: 'gol', jugador_id: x.jugador.id, jugador: `${x.jugador.apellidos} ${x.jugador.nombres}`, equipo_id: null }))
+      if (t) t.forEach(x => evs.push({ tipo: x.tipo, jugador_id: x.jugador.id, jugador: `${x.jugador.apellidos} ${x.jugador.nombres}`, equipo_id: x.equipo.id }))
       setEventos(evs)
     } catch (err) {
       console.error(err)
@@ -353,7 +422,6 @@ export default function Actas() {
 
   if (cargando && vista === 'lista') return <div className="p-8 text-center">Cargando...</div>
 
-  // --- VISTA 1: LISTA DE PARTIDOS ---
   if (vista === 'lista') {
     return (
       <div className="max-w-4xl mx-auto">
@@ -400,7 +468,6 @@ export default function Actas() {
     )
   }
 
-  // --- VISTA: VER ACTA FINALIZADA (Historial) ---
   if (vista === 'ver_acta') {
     return (
       <div className="max-w-2xl mx-auto pb-20">
@@ -437,7 +504,6 @@ export default function Actas() {
     )
   }
 
-  // --- VISTA: FIRMAR ACTA (Capitanes) ---
   if (vista === 'firmar_acta') {
     return (
       <div className="max-w-2xl mx-auto pb-20">
@@ -471,7 +537,6 @@ export default function Actas() {
     )
   }
 
-  // --- VISTA: ARMAR PLANILLA ---
   if (vista === 'planilla') {
     const titularesL = Object.entries(planilla).filter(([id, r]) => r === 'titular' && jugadoresLocal.some(j => j.id === id)).length
     const titularesV = Object.entries(planilla).filter(([id, r]) => r === 'titular' && jugadoresVisitante.some(j => j.id === id)).length
@@ -539,7 +604,6 @@ export default function Actas() {
     )
   }
 
-  // --- VISTA: PARTIDO EN CURSO ---
   return (
     <div className="max-w-4xl mx-auto pb-20">
       <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
