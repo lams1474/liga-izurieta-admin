@@ -4,12 +4,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { FileText, ArrowLeft, Users, CheckCircle, AlertTriangle, Lock, Target, StopCircle, PenTool, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 
 export default function Actas() {
   const { usuario } = useAuth()
   
-  const [pestana, setPestana] = useState('pendientes') // 'pendientes' | 'historial'
+  const [pestana, setPestana] = useState('pendientes')
   const [partidos, setPartidos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [partidoSeleccionado, setPartidoSeleccionado] = useState(null)
@@ -23,9 +22,9 @@ export default function Actas() {
   const [marcador, setMarcador] = useState({ local: 0, visitante: 0 })
   const [eventos, setEventos] = useState([]) 
   const [modalAccion, setModalAccion] = useState(null) 
+  const [novedades, setNovedades] = useState('')
 
   const [guardando, setGuardando] = useState(false)
-
   const esCapitan = usuario?.rol === 'capitan'
 
   useEffect(() => {
@@ -35,7 +34,8 @@ export default function Actas() {
         local:equipos!partidos_equipo_local_id_fkey (id, nombre, disciplina, categoria),
         visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre),
         fecha:fechas (numero, etapa:etapas(nombre)),
-        acta:actas (id, estado)
+        arbitro:arbitros (nombres, apellidos),
+        acta:actas (id, estado, observaciones)
       `)
 
       if (pestana === 'pendientes' && !esCapitan) {
@@ -45,7 +45,6 @@ export default function Actas() {
       }
 
       const { data, error } = await query.order('creado_en', { ascending: false })
-
       if (error) toast.error('Error al cargar partidos')
       else setPartidos(data || [])
       
@@ -57,18 +56,19 @@ export default function Actas() {
   async function seleccionarPartido(partido) {
     setPartidoSeleccionado(partido)
     setPlanilla({})
+    setNovedades(partido.acta?.[0]?.observaciones || '')
     setCargando(true)
 
     try {
       const { data: rule } = await supabase.from('reglas_disciplina').select('min_jugadores, max_acta').eq('disciplina', partido.local.disciplina).eq('categoria', partido.local.categoria).single()
       setReglas(rule || { min_jugadores: 4, max_acta: 12 })
 
-      // Cargar eventos
-      const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(apellidos, nombres)').eq('partido_id', partido.id)
-      const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(apellidos, nombres)').eq('partido_id', partido.id)
+      const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(apellidos, nombres, cedula)').eq('partido_id', partido.id)
+      const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(apellidos, nombres, cedula), equipo:equipos(id)').eq('partido_id', partido.id)
+      
       let evs = []
-      if (goles) goles.forEach(g => evs.push({ tipo: 'gol', jugador: g.jugador.apellidos, equipo_id: null }))
-      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador: t.jugador.apellidos, equipo_id: null }))
+      if (goles) goles.forEach(g => evs.push({ tipo: 'gol', jugador: g.jugador.apellidos, cedula: g.jugador.cedula, equipo_id: null }))
+      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador: t.jugador.apellidos, cedula: t.jugador.cedula, equipo_id: t.equipo.id }))
       setEventos(evs)
       setMarcador({ local: partido.goles_local || 0, visitante: partido.goles_visitante || 0 })
 
@@ -78,7 +78,6 @@ export default function Actas() {
         return
       }
 
-      // Si es pendiente, cargar planilla
       const cargarJugadores = async (equipoId) => {
         const { data: inscripciones } = await supabase.from('jugador_equipo').select(`dorsal, jugador:jugadores!jugador_equipo_jugador_id_fkey (id, apellidos, nombres, codigo_interno)`).eq('equipo_id', equipoId).eq('activo', true)
         const promesas = (inscripciones || []).filter(i => i.jugador).map(async (i) => {
@@ -98,9 +97,7 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
-      if (esCapitan) setVista('firmar_acta')
-      else setVista('planilla')
-
+      setVista(esCapitan ? 'firmar_acta' : 'planilla')
     } catch (err) {
       console.error(err)
       toast.error('Error al cargar datos')
@@ -109,60 +106,136 @@ export default function Actas() {
     }
   }
 
-  // ============ GENERAR PDF DEL ACTA ============
+  // ============ GENERAR PDF OFICIAL ============
   function descargarPDF() {
     try {
       const doc = new jsPDF()
       const p = partidoSeleccionado
       
-      doc.setFontSize(16)
-      doc.setTextColor(30, 58, 138)
-      doc.text('LIGA DEPORTIVA BARRIAL JOSE IGNACIO IZURIETA', 14, 20)
-      
-      doc.setFontSize(12)
+      // Colores y fuentes
       doc.setTextColor(0, 0, 0)
-      doc.text(`ACTA OFICIAL DE PARTIDO`, 14, 28)
-      doc.text(`Etapa: ${p.fecha?.etapa?.nombre} - Fecha ${p.fecha?.numero}`, 14, 35)
-      doc.text(`Cancha: ${p.cancha || 'No definida'} | Hora: ${p.hora?.slice(0,5) || '--:--'}`, 14, 41)
-
-      doc.setFontSize(14)
-      doc.text(`${p.local?.nombre}   ${p.goles_local} - ${p.goles_visitante}   ${p.visitante?.nombre}`, 14, 52)
-
-      // Tabla de eventos
-      const filas = eventos.map(ev => [
-        ev.jugador,
-        ev.tipo === 'gol' ? 'Gol' : ev.tipo === 'amarilla' ? 'Tarjeta Amarilla' : 'Tarjeta Roja'
-      ])
-
-      autoTable(doc, {
-        startY: 60,
-        head: [['Jugador', 'Evento']],
-        body: filas.length > 0 ? filas : [['Sin eventos registrados', '-']],
-        theme: 'grid',
-        headStyles: { fillColor: [30, 58, 138] }
-      })
-
-      // Firmas (Simuladas visualmente para el PDF)
-      const finalY = doc.lastAutoTable.finalY + 30
+      
+      // --- ENCABEZADO OFICIAL ---
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(16)
+      doc.text('LIGA DEPORTIVA BARRIAL JOSE I. IZURIETA', 105, 20, { align: 'center' })
+      
       doc.setFontSize(10)
-      doc.text('_________________________', 20, finalY)
-      doc.text('Firma Árbitro', 30, finalY + 5)
+      doc.setFont("helvetica", "normal")
+      doc.text('PUJILI - ECUADOR', 105, 26, { align: 'center' })
+      doc.text('FUNDADA EL 09 DE MARZO DEL 2013', 20, 33)
+      doc.text('ACUERDO MUNICIPAL NO. 034-GADMP-2013', 130, 33)
       
-      doc.text('_________________________', 80, finalY)
-      doc.text('Firma Vocal', 90, finalY + 5)
-      
-      doc.text('_________________________', 140, finalY)
-      doc.text('Firma Capitán Local', 145, finalY + 5)
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(14)
+      doc.text('ACTA DE JUEGO', 105, 45, { align: 'center' })
 
-      doc.save(`Acta_${p.local?.nombre}_vs_${p.visitante?.nombre}.pdf`)
-      toast.success('PDF descargado')
+      // --- DATOS DEL PARTIDO ---
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "normal")
+      
+      const nombreArbitro = p.arbitro ? `${p.arbitro.nombres} ${p.arbitro.apellidos}` : '________________________'
+      doc.text(`NOMBRE DEL SR. ARBITRO: ${nombreArbitro}`, 20, 55)
+      
+      const fechaStr = new Date(p.fecha_inicio || Date.now()).toLocaleDateString()
+      doc.text(`FECHA: ${fechaStr}`, 20, 61)
+      doc.text(`CANCHA: ${p.cancha || '_____________'}`, 100, 61)
+      doc.text(`HORA: ${p.hora?.slice(0,5) || '________'}`, 160, 61)
+
+      // --- TARJETAS CLUB LOCAL ---
+      const tarjetasLocal = eventos.filter(ev => (ev.tipo === 'amarilla' || ev.tipo === 'roja') && ev.equipo_id === p.local.id)
+      const tarjetasVisitante = eventos.filter(ev => (ev.tipo === 'amarilla' || ev.tipo === 'roja') && ev.equipo_id === p.visitante.id)
+
+      const dibujarSeccionTarjetas = (startY, nombreClub, tarjetas) => {
+        doc.setFont("helvetica", "bold")
+        doc.text(`TARJETAS DEL CLUB: ${nombreClub.toUpperCase()}`, 20, startY)
+        
+        let yAmarillas = startY + 10
+        let yRojas = startY + 55
+
+        // Amarillas
+        doc.setFont("helvetica", "bold")
+        doc.text('TARJETAS AMARILLAS:', 20, yAmarillas)
+        doc.setFont("helvetica", "normal")
+        yAmarillas += 6
+        
+        const amarillas = tarjetas.filter(t => t.tipo === 'amarilla')
+        for(let i=0; i<6; i++) {
+          doc.text(`NO. ______`, 20, yAmarillas + (i*7))
+          doc.line(45, yAmarillas + (i*7), 140, yAmarillas + (i*7))
+          if (amarillas[i]) doc.text(amarillas[i].jugador, 47, yAmarillas + (i*7) - 1)
+          doc.text(`POR: ______________`, 145, yAmarillas + (i*7))
+        }
+
+        // Rojas
+        doc.setFont("helvetica", "bold")
+        doc.text('TARJETAS ROJAS:', 20, yRojas)
+        doc.setFont("helvetica", "normal")
+        yRojas += 6
+        
+        const rojas = tarjetas.filter(t => t.tipo === 'roja')
+        for(let i=0; i<4; i++) {
+          doc.text(`NO. ______`, 20, yRojas + (i*7))
+          doc.line(45, yRojas + (i*7), 140, yRojas + (i*7))
+          if (rojas[i]) doc.text(rojas[i].jugador, 47, yRojas + (i*7) - 1)
+          doc.text(`POR: ______________`, 145, yRojas + (i*7))
+        }
+
+        return yRojas + 35 // Retornar la siguiente coordenada Y
+      }
+
+      let nextY = dibujarSeccionTarjetas(70, p.local.nombre, tarjetasLocal)
+      nextY = dibujarSeccionTarjetas(nextY, p.visitante.nombre, tarjetasVisitante)
+
+      // --- NOVEDADES ---
+      doc.setFont("helvetica", "bold")
+      doc.text('NOVEDADES:', 20, nextY)
+      doc.setFont("helvetica", "normal")
+      
+      // Caja de texto para novedades
+      const splitText = doc.splitTextToSize(novedades || 'Sin novedades registradas.', 170)
+      doc.text(splitText, 20, nextY + 6)
+      
+      // Líneas para simular el formulario físico debajo del texto
+      let lineY = nextY + 6 + (splitText.length * 5) + 5
+      for(let i=0; i<4; i++) {
+        doc.line(20, lineY + (i*8), 190, lineY + (i*8))
+      }
+
+      // --- FIRMAS ---
+      const firmaY = lineY + 45
+      doc.line(80, firmaY, 130, firmaY)
+      doc.setFont("helvetica", "bold")
+      doc.text('FIRMA DEL SR. ÁRBITRO', 105, firmaY + 5, { align: 'center' })
+
+      doc.setFont("helvetica", "normal")
+      doc.text('Acta aprobada el día: _____________________', 20, firmaY + 15)
+
+      const firmaY2 = firmaY + 25
+      doc.line(20, firmaY2, 60, firmaY2)
+      doc.line(80, firmaY2, 120, firmaY2)
+      doc.line(140, firmaY2, 180, firmaY2)
+      
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(8)
+      doc.text('FIRMA PRESIDENTE C.D.LDBJII', 40, firmaY2 + 4, { align: 'center' })
+      doc.text('FIRMA SECRETARIO C.D.LDBJII', 100, firmaY2 + 4, { align: 'center' })
+      doc.text('FIRMA VOCAL C.D.LDBJII', 160, firmaY2 + 4, { align: 'center' })
+
+      // --- PIE DE PÁGINA ---
+      doc.setFontSize(9)
+      doc.text('VIVE EL FUTBOL SIN DROGAS Y SIN ALCOHOL', 20, 285)
+      doc.text('CAMPEONATO 2026', 170, 285)
+
+      doc.save(`Acta_Oficial_${p.local?.nombre}_vs_${p.visitante?.nombre}.pdf`)
+      toast.success('PDF Oficial descargado')
     } catch (err) {
       console.error(err)
       toast.error('Error al generar PDF')
     }
   }
 
-  // Funciones de planilla y partido (recortadas para brevedad, son las mismas que ya tenías)
+  // --- Funciones de estado (Planilla, Goles, Tarjetas, Finalizar) ---
   function toggleJugador(jugadorId, esLocal) {
     const jugadoresEquipo = esLocal ? jugadoresLocal : jugadoresVisitante
     const jugador = jugadoresEquipo.find(j => j.id === jugadorId)
@@ -221,12 +294,13 @@ export default function Actas() {
       }
       toast.success('Registrado')
       setModalAccion(null)
-      // Recargar eventos rápido
-      const { data: g } = await supabase.from('goles').select('*, jugador:jugadores(apellidos)').eq('partido_id', partidoSeleccionado.id)
-      const { data: t } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(apellidos)').eq('partido_id', partidoSeleccionado.id)
+      
+      // Recargar eventos
+      const { data: g } = await supabase.from('goles').select('*, jugador:jugadores(apellidos, cedula)').eq('partido_id', partidoSeleccionado.id)
+      const { data: t } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(apellidos, cedula), equipo:equipos(id)').eq('partido_id', partidoSeleccionado.id)
       let evs = []
-      if (g) g.forEach(x => evs.push({ tipo: 'gol', jugador: x.jugador.apellidos, equipo_id: null }))
-      if (t) t.forEach(x => evs.push({ tipo: x.tipo, jugador: x.jugador.apellidos, equipo_id: null }))
+      if (g) g.forEach(x => evs.push({ tipo: 'gol', jugador: x.jugador.apellidos, cedula: x.jugador.cedula, equipo_id: null }))
+      if (t) t.forEach(x => evs.push({ tipo: x.tipo, jugador: x.jugador.apellidos, cedula: x.jugador.cedula, equipo_id: x.equipo.id }))
       setEventos(evs)
     } catch (err) {
       console.error(err)
@@ -240,11 +314,15 @@ export default function Actas() {
     setGuardando(true)
     try {
       await supabase.from('partidos').update({ jugado: true }).eq('id', partidoSeleccionado.id)
+      
       let actaId = partidoSeleccionado.acta?.[0]?.id
       if (!actaId) {
-        const { data: nuevaActa } = await supabase.from('actas').insert({ partido_id: partidoSeleccionado.id, estado: 'firmando' }).select().single()
+        const { data: nuevaActa } = await supabase.from('actas').insert({ partido_id: partidoSeleccionado.id, estado: 'firmando', observaciones: novedades }).select().single()
         actaId = nuevaActa.id
+      } else {
+        await supabase.from('actas').update({ observaciones: novedades }).eq('id', actaId)
       }
+
       await supabase.from('firmas_acta').insert({ acta_id: actaId, firmante_tipo: usuario.rol === 'arbitro' ? 'arbitro' : 'vocal', firmante_id: usuario.id })
       toast.success('Partido finalizado. Esperando firma de capitanes.')
       setVista('lista')
@@ -267,6 +345,7 @@ export default function Actas() {
       setVista('lista')
     } catch (err) {
       console.error(err)
+      toast.error(err.message || 'Error al firmar')
     } finally {
       setGuardando(false)
     }
@@ -328,7 +407,7 @@ export default function Actas() {
          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <div className="flex justify-between items-start mb-6">
               <button onClick={() => setVista('lista')} className="text-gray-500 hover:text-gray-800 font-semibold flex items-center gap-1"><ArrowLeft size={18} /> Volver</button>
-              <button onClick={descargarPDF} className="bg-red-600 text-white px-4 py-2 rounded-md font-semibold flex items-center gap-2 hover:bg-red-700"><Download size={18} /> Descargar PDF</button>
+              <button onClick={descargarPDF} className="bg-red-600 text-white px-4 py-2 rounded-md font-semibold flex items-center gap-2 hover:bg-red-700"><Download size={18} /> Descargar PDF Oficial</button>
             </div>
 
             <h2 className="text-2xl font-bold text-center text-liga-azul mb-2">Acta Oficial</h2>
@@ -489,6 +568,17 @@ export default function Actas() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <label className="block text-sm font-bold text-gray-700 mb-2">Novedades del Partido (Opcional):</label>
+        <textarea 
+          value={novedades}
+          onChange={(e) => setNovedades(e.target.value)}
+          placeholder="Escribe aquí lesiones, incidentes, retrasos, etc."
+          className="w-full p-3 border border-gray-300 rounded-md focus:ring-liga-azul focus:border-liga-azul"
+          rows="3"
+        />
       </div>
 
       <button onClick={finalizarPartido} disabled={guardando} className="w-full bg-liga-rojo text-white py-3 rounded-lg font-bold text-lg hover:bg-liga-rojo/90 flex items-center justify-center gap-2 mb-6 shadow-md">
