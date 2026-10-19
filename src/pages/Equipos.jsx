@@ -1,38 +1,36 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect, useCallback } from 'react'
-import {
-  Shield, Plus, Search, Filter, RefreshCw, CheckCircle2, XCircle, Edit
-} from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { Shield, Upload, Users, Power, X, Search, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
-import EquipoFormDrawer from '../components/EquipoFormDrawer'
+import { comprimirImagen, validarImagen } from '../lib/imagenUtils'
+import { subirEscudo } from '../lib/escudoUtils'
 
 export default function Equipos() {
-  const [cargando, setCargando] = useState(true)
   const [equipos, setEquipos] = useState([])
+  const [cargando, setCargando] = useState(true)
   const [busqueda, setBusqueda] = useState('')
-  const [filtroDisciplina, setFiltroDisciplina] = useState('')
-  const [filtroCategoria, setFiltroCategoria] = useState('')
 
-  // Estado del drawer
-  const [drawerAbierto, setDrawerAbierto] = useState(false)
-  const [equipoEditando, setEquipoEditando] = useState(null)
+  // Estados para el modal de la plantilla
+  const [equipoSeleccionado, setEquipoSeleccionado] = useState(null)
+  const [jugadores, setJugadores] = useState([])
+  const [cargandoJugadores, setCargandoJugadores] = useState(false)
 
-  const cargarEquipos = useCallback(async () => {
+  // Estados para la subida de escudo
+  const [subiendoEscudo, setSubiendoEscudo] = useState(null)
+  const fileInputRef = useRef(null)
+  const [equipoParaEscudo, setEquipoParaEscudo] = useState(null)
+
+  // Cargar equipos
+  async function cargarEquipos() {
     setCargando(true)
     try {
-      let query = supabase.from('equipos').select('*').order('nombre')
-
-      if (filtroDisciplina) {
-        query = query.eq('disciplina', filtroDisciplina)
-      }
-      if (filtroCategoria) {
-        query = query.eq('categoria', filtroCategoria)
-      }
-
-      const { data, error } = await query
+      const { data, error } = await supabase
+        .from('equipos')
+        .select('*')
+        .order('nombre')
+      
       if (error) throw error
-
       setEquipos(data || [])
     } catch (err) {
       console.error(err)
@@ -40,214 +38,285 @@ export default function Equipos() {
     } finally {
       setCargando(false)
     }
-  }, [filtroDisciplina, filtroCategoria])
+  }
 
   useEffect(() => {
     cargarEquipos()
-  }, [cargarEquipos])
+  }, [])
 
-  const equiposFiltrados = equipos.filter((eq) =>
-    eq.nombre.toLowerCase().includes(busqueda.toLowerCase())
-  )
+  // Ver plantilla de jugadores
+  async function verPlantilla(equipo) {
+    setEquipoSeleccionado(equipo)
+    setCargandoJugadores(true)
+    try {
+      const { data, error } = await supabase
+        .from('jugador_equipo')
+        .select(`
+          dorsal, posicion, activo,
+          jugador:jugadores!jugador_equipo_jugador_id_fkey (
+            id, apellidos, nombres, cedula, foto_url, calificado
+          )
+        `)
+        .eq('equipo_id', equipo.id)
+        .eq('activo', true)
+      
+      if (error) throw error
+      
+      const lista = (data || [])
+        .filter(i => i.jugador)
+        .map(i => ({ ...i.jugador, dorsal: i.dorsal, posicion: i.posicion }))
+        .sort((a, b) => a.apellidos.localeCompare(b.apellidos))
 
-  const totalEquipos = equipos.length
-  const totalFutsala = equipos.filter((e) => e.disciplina === 'futsala').length
-  const totalFutbol = equipos.filter((e) => e.disciplina === 'futbol').length
-
-  function abrirCrear() {
-    setEquipoEditando(null)
-    setDrawerAbierto(true)
+      setJugadores(lista)
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al cargar la plantilla')
+    } finally {
+      setCargandoJugadores(false)
+    }
   }
 
-  function abrirEditar(equipo) {
-    setEquipoEditando(equipo)
-    setDrawerAbierto(true)
+  // Activar / Desactivar Equipo
+  async function toggleActivo(equipo) {
+    const accion = equipo.activo ? 'desactivar' : 'activar'
+    if (!window.confirm(`¿Estás seguro de ${accion} el equipo ${equipo.nombre}?`)) return
+
+    try {
+      const { error } = await supabase
+        .from('equipos')
+        .update({ activo: !equipo.activo })
+        .eq('id', equipo.id)
+      
+      if (error) throw error
+      
+      toast.success(`Equipo ${accion}do correctamente`)
+      cargarEquipos()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al actualizar estado')
+    }
   }
 
-  function cerrarDrawer() {
-    setDrawerAbierto(false)
-    setEquipoEditando(null)
+  // Manejo de subida de escudo
+  function abrirSelectorEscudo(equipo) {
+    setEquipoParaEscudo(equipo)
+    fileInputRef.current?.click()
   }
+
+  async function handleEscudoSeleccionado(e) {
+    const file = e.target.files?.[0]
+    if (!file || !equipoParaEscudo) return
+
+    const validacion = validarImagen(file, 5)
+    if (!validacion.valido) {
+      toast.error(validacion.error)
+      e.target.value = ''
+      return
+    }
+
+    setSubiendoEscudo(equipoParaEscudo.id)
+    toast.loading('Comprimiendo escudo...', { id: 'escudo' })
+
+    try {
+      const comprimida = await comprimirImagen(file, { maxAncho: 500, maxAlto: 500, calidad: 0.9 })
+      
+      toast.loading('Subiendo escudo...', { id: 'escudo' })
+      
+      const url = await subirEscudo(comprimida, equipoParaEscudo.id)
+      
+      const { error } = await supabase
+        .from('equipos')
+        .update({ escudo_url: url })
+        .eq('id', equipoParaEscudo.id)
+      
+      if (error) throw error
+
+      toast.success('¡Escudo actualizado!', { id: 'escudo' })
+      cargarEquipos()
+    } catch (err) {
+      console.error(err)
+      toast.error(err.message || 'Error al subir escudo', { id: 'escudo' })
+    } finally {
+      setSubiendoEscudo(null)
+      setEquipoParaEscudo(null)
+      e.target.value = ''
+    }
+  }
+
+  // Filtrar equipos
+  const equiposFiltrados = equipos.filter(eq => {
+    const texto = busqueda.toLowerCase()
+    return eq.nombre.toLowerCase().includes(texto) || 
+           eq.disciplina.toLowerCase().includes(texto) || 
+           eq.categoria.toLowerCase().includes(texto)
+  })
+
+  if (cargando) return <div className="p-8 text-center text-gray-500">Cargando equipos...</div>
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Encabezado */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="max-w-6xl mx-auto pb-12">
+      {/* Header */}
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Shield className="text-liga-azul" size={28} />
-            Módulo de Equipos / Clubes
-          </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Gestión general de clubes afiliados, disciplinas y categorías
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-liga-azul">Gestión de Equipos</h1>
+          <p className="text-gray-500 text-sm mt-1">Administra los clubes, escudos y plantillas de la liga</p>
         </div>
-        <button
-          onClick={abrirCrear}
-          className="bg-liga-azul text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-liga-azul/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
-        >
-          <Plus size={18} />
-          Nuevo Equipo
-        </button>
-      </div>
-
-      {/* Tarjetas resumen */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">Total Equipos</p>
-            <p className="text-2xl font-bold text-liga-azul mt-1">{totalEquipos}</p>
-          </div>
-          <div className="w-10 h-10 bg-blue-50 text-liga-azul rounded-lg flex items-center justify-center">
-            <Shield size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">Futsala</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">{totalFutsala}</p>
-          </div>
-          <div className="w-10 h-10 bg-green-50 text-green-600 rounded-lg flex items-center justify-center">
-            <Shield size={20} />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">Fútbol Senior</p>
-            <p className="text-2xl font-bold text-amber-600 mt-1">{totalFutbol}</p>
-          </div>
-          <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center">
-            <Shield size={20} />
-          </div>
-        </div>
-      </div>
-
-      {/* Barra de Búsqueda y Filtros */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full md:w-80">
+        
+        <div className="relative w-full sm:w-72">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar por nombre..."
+            placeholder="Buscar equipo..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
+            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-liga-azul"
           />
         </div>
-
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
-          <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 text-sm">
-            <Filter size={16} className="text-gray-500" />
-            <select
-              value={filtroDisciplina}
-              onChange={(e) => setFiltroDisciplina(e.target.value)}
-              className="bg-transparent border-none text-gray-700 text-sm focus:outline-none"
-            >
-              <option value="">Todas las disciplinas</option>
-              <option value="futsala">Futsala</option>
-              <option value="futbol">Fútbol</option>
-              <option value="ecuavoly">Ecuavoly</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 text-sm">
-            <select
-              value={filtroCategoria}
-              onChange={(e) => setFiltroCategoria(e.target.value)}
-              className="bg-transparent border-none text-gray-700 text-sm focus:outline-none"
-            >
-              <option value="">Todas las categorías</option>
-              <option value="hombres">Hombres</option>
-              <option value="mujeres">Mujeres</option>
-              <option value="sub12">Sub-12</option>
-              <option value="master40">Master 40</option>
-            </select>
-          </div>
-
-          <button
-            onClick={cargarEquipos}
-            className="p-2 text-gray-600 hover:text-liga-azul rounded-lg hover:bg-gray-100 transition-colors"
-            title="Recargar equipos"
-          >
-            <RefreshCw size={18} />
-          </button>
-        </div>
       </div>
 
-      {/* Tabla de Equipos */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {cargando ? (
-          <div className="p-12 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-liga-azul mx-auto"></div>
-            <p className="mt-3 text-sm text-gray-500">Cargando clubes...</p>
-          </div>
-        ) : equiposFiltrados.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">
-            No se encontraron equipos registrados.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 uppercase text-xs">
-                <tr>
-                  <th className="px-6 py-3.5">Equipo</th>
-                  <th className="px-6 py-3.5">Disciplina</th>
-                  <th className="px-6 py-3.5">Categoría</th>
-                  <th className="px-6 py-3.5">Estado</th>
-                  <th className="px-6 py-3.5 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {equiposFiltrados.map((eq) => (
-                  <tr key={eq.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-semibold text-gray-900 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-liga-azul/10 text-liga-azul flex items-center justify-center font-bold text-xs">
-                        {eq.nombre.substring(0, 2).toUpperCase()}
-                      </div>
-                      {eq.nombre}
-                    </td>
-                    <td className="px-6 py-4 text-gray-700 capitalize">
-                      {eq.disciplina}
-                    </td>
-                    <td className="px-6 py-4 text-gray-700 capitalize">
-                      {eq.categoria}
-                    </td>
-                    <td className="px-6 py-4">
-                      {eq.activo ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700">
-                          <CheckCircle2 size={13} /> Activo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700">
-                          <XCircle size={13} /> Inactivo
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right font-medium">
-                      <button
-                        onClick={() => abrirEditar(eq)}
-                        className="text-liga-azul hover:bg-blue-50 p-2 rounded-md transition-colors flex items-center gap-1 ml-auto text-xs font-semibold"
-                      >
-                        <Edit size={15} /> Editar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Drawer Formulario */}
-      <EquipoFormDrawer
-        abierto={drawerAbierto}
-        onCerrar={cerrarDrawer}
-        equipoEditar={equipoEditando}
-        onGuardado={cargarEquipos}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png"
+        onChange={handleEscudoSeleccionado}
+        className="hidden"
       />
+
+      {/* Grid de Equipos */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {equiposFiltrados.map(equipo => (
+          <div 
+            key={equipo.id} 
+            className={`bg-white rounded-lg shadow-md p-5 flex flex-col relative overflow-hidden transition-all ${
+              !equipo.activo ? 'opacity-60 border-2 border-red-200' : 'border-2 border-transparent'
+            }`}
+          >
+            {!equipo.activo && (
+              <div className="absolute top-2 right-2 bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded">
+                INACTIVO
+              </div>
+            )}
+
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-gray-200 flex-shrink-0 relative group">
+                {subiendoEscudo === equipo.id ? (
+                  <Loader size={24} className="text-liga-azul animate-spin" />
+                ) : equipo.escudo_url ? (
+                  <img src={equipo.escudo_url} alt={equipo.nombre} className="w-full h-full object-contain p-1" />
+                ) : (
+                  <Shield size={28} className="text-gray-400" />
+                )}
+                
+                <button
+                  onClick={() => abrirSelectorEscudo(equipo)}
+                  disabled={subiendoEscudo === equipo.id}
+                  className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  title="Cambiar escudo"
+                >
+                  <Upload size={20} />
+                </button>
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-800 text-lg leading-tight">{equipo.nombre}</h3>
+                <div className="flex gap-2 mt-1">
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold uppercase">{equipo.disciplina}</span>
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-semibold uppercase">{equipo.categoria}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-auto pt-4 border-t flex gap-2">
+              <button 
+                onClick={() => verPlantilla(equipo)}
+                className="flex-1 bg-liga-azul text-white py-2 rounded-md font-semibold hover:bg-liga-azul/90 flex justify-center items-center gap-2 text-sm transition-colors"
+              >
+                <Users size={16} /> Plantilla
+              </button>
+              <button 
+                onClick={() => toggleActivo(equipo)}
+                className={`px-3 py-2 rounded-md font-semibold flex justify-center items-center gap-2 text-sm transition-colors border ${
+                  equipo.activo 
+                    ? 'bg-white text-red-600 border-red-200 hover:bg-red-50' 
+                    : 'bg-white text-green-600 border-green-200 hover:bg-green-50'
+                }`}
+                title={equipo.activo ? 'Desactivar equipo' : 'Activar equipo'}
+              >
+                <Power size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* MODAL: VER PLANTILLA */}
+      {equipoSeleccionado && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 sm:p-6">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
+            <div className="bg-liga-azul text-white p-4 flex items-center justify-between rounded-t-lg flex-shrink-0">
+              <div className="flex items-center gap-3">
+                {equipoSeleccionado.escudo_url ? (
+                  <img src={equipoSeleccionado.escudo_url} alt="Escudo" className="w-10 h-10 object-contain bg-white rounded-full p-0.5" />
+                ) : (
+                  <Shield size={24} />
+                )}
+                <div>
+                  <h2 className="text-xl font-bold leading-tight">{equipoSeleccionado.nombre}</h2>
+                  <p className="text-xs text-liga-amarillo capitalize">{equipoSeleccionado.disciplina} · {equipoSeleccionado.categoria}</p>
+                </div>
+              </div>
+              <button onClick={() => setEquipoSeleccionado(null)} className="p-2 hover:bg-white/10 rounded-md transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1">
+              {cargandoJugadores ? (
+                <div className="text-center py-12 text-gray-500">Cargando plantilla...</div>
+              ) : jugadores.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <Users size={48} className="mx-auto text-gray-300 mb-2" />
+                  Este equipo no tiene jugadores registrados.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100 text-gray-600">
+                      <tr>
+                        <th className="px-3 py-2 text-center rounded-tl-md">Dorsal</th>
+                        <th className="px-3 py-2 text-left">Jugador</th>
+                        <th className="px-3 py-2 text-left">Cédula</th>
+                        <th className="px-3 py-2 text-center rounded-tr-md">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {jugadores.map(j => (
+                        <tr key={j.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-center font-bold text-gray-700">{j.dorsal || '-'}</td>
+                          <td className="px-3 py-2 font-semibold text-gray-800">{j.apellidos} {j.nombres}</td>
+                          <td className="px-3 py-2 text-gray-600 font-mono text-xs">{j.cedula}</td>
+                          <td className="px-3 py-2 text-center">
+                            {j.calificado ? (
+                              <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-semibold">Calificado</span>
+                            ) : (
+                              <span className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded font-semibold">No Calificado</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t bg-gray-50 flex justify-end rounded-b-lg flex-shrink-0">
+              <button onClick={() => setEquipoSeleccionado(null)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md font-semibold hover:bg-gray-300 transition-colors">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
