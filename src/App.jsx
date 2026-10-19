@@ -10,6 +10,7 @@ import Calendario from './pages/Calendario'
 import Sanciones from './pages/Sanciones'
 import Actas from './pages/Actas'
 import Reportes from './pages/Reportes'
+import Configuracion from './pages/Configuracion' // <-- NUEVO IMPORT
 import MiCarnet from './pages/MiCarnet'
 import MisJugadores from './pages/MisJugadores'
 import RegistroJugador from './pages/RegistroJugador'
@@ -163,6 +164,18 @@ function App() {
           <ProtectedRoute rolesPermitidos={['admin']}>
             <Layout>
               <Usuarios />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* NUEVA RUTA: CONFIGURACIÓN */}
+      <Route
+        path="/configuracion"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <Configuracion />
             </Layout>
           </ProtectedRoute>
         }
