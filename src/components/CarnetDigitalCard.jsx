@@ -2,11 +2,9 @@ import carnetFondo from '../assets/carnet-fondo.png'
 import selloLiga from '../assets/sello-liga.png'
 
 export default function CarnetDigitalCard({ jugador, equipo }) {
-  // Validación por si el equipo llega vacío
   const nombreEquipo = equipo?.nombre || 'SIN EQUIPO'
   const escudoUrl = equipo?.escudo_url
 
-  // Generamos la URL para el QR
   const urlVerificacion = `https://web-liga-izurieta.vercel.app/verificar?cedula=${jugador?.cedula}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(urlVerificacion)}`
 
@@ -28,10 +26,14 @@ export default function CarnetDigitalCard({ jugador, equipo }) {
       </div>
 
       {/* 3. DATOS DEL JUGADOR (Cristal Esmerilado) */}
-      <div className="absolute top-[26%] left-[27%] right-[15%] z-10 bg-black/30 backdrop-blur-sm p-3 rounded-r-lg border-l-4 border-liga-amarillo shadow-lg">
-        <h3 className="text-white font-bold text-lg leading-tight mb-1 drop-shadow-md whitespace-nowrap overflow-hidden text-ellipsis">
+      {/* Ajusté el top y el padding para que quepa el nombre en 2 líneas */}
+      <div className="absolute top-[22%] left-[27%] right-[15%] z-10 bg-black/30 backdrop-blur-sm p-3 rounded-r-lg border-l-4 border-liga-amarillo shadow-lg flex flex-col justify-center min-h-[100px]">
+        
+        {/* EL NOMBRE AHORA PUEDE USAR 2 LÍNEAS (break-words, sin nowrap) */}
+        <h3 className="text-white font-bold text-[16px] leading-[1.2] mb-1 drop-shadow-md break-words">
           {jugador?.apellidos} {jugador?.nombres}
         </h3>
+        
         <p className="text-white text-sm font-mono mb-1 drop-shadow-md">
           C.C. {jugador?.cedula}
         </p>
@@ -45,7 +47,7 @@ export default function CarnetDigitalCard({ jugador, equipo }) {
         <img src={qrUrl} alt="QR Verificación" className="w-[70px] h-[70px]" />
       </div>
 
-      {/* 5. ESCUDO DEL CLUB (Con validación doble) */}
+      {/* 5. ESCUDO DEL CLUB */}
       <div className="absolute bottom-[10%] right-[5%] z-10 w-24 h-24 bg-white rounded-full p-1 flex items-center justify-center shadow-xl border-4 border-blue-900">
         {escudoUrl ? (
           <img src={escudoUrl} alt="Escudo Club" className="w-full h-full object-contain rounded-full" />

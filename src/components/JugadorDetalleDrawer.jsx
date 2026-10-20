@@ -52,7 +52,7 @@ export default function JugadorDetalleDrawer({
         .select(`
           id, dorsal, posicion, activo, fecha_inscripcion,
           equipo:equipos!jugador_equipo_equipo_id_fkey (
-            id, nombre, disciplina, categoria
+            id, nombre, disciplina, categoria, escudo_url
           )
         `)
         .eq('jugador_id', jugadorId)
