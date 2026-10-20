@@ -2,7 +2,11 @@ import carnetFondo from '../assets/carnet-fondo.png'
 import selloLiga from '../assets/sello-liga.png'
 
 export default function CarnetDigitalCard({ jugador, equipo }) {
-  // Generamos la URL para el QR que apunta a la web pública
+  // Validación por si el equipo llega vacío
+  const nombreEquipo = equipo?.nombre || 'SIN EQUIPO'
+  const escudoUrl = equipo?.escudo_url
+
+  // Generamos la URL para el QR
   const urlVerificacion = `https://web-liga-izurieta.vercel.app/verificar?cedula=${jugador?.cedula}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(urlVerificacion)}`
 
@@ -23,7 +27,7 @@ export default function CarnetDigitalCard({ jugador, equipo }) {
         )}
       </div>
 
-      {/* 3. DATOS DEL JUGADOR (Cristal) */}
+      {/* 3. DATOS DEL JUGADOR (Cristal Esmerilado) */}
       <div className="absolute top-[26%] left-[27%] right-[15%] z-10 bg-black/30 backdrop-blur-sm p-3 rounded-r-lg border-l-4 border-liga-amarillo shadow-lg">
         <h3 className="text-white font-bold text-lg leading-tight mb-1 drop-shadow-md whitespace-nowrap overflow-hidden text-ellipsis">
           {jugador?.apellidos} {jugador?.nombres}
@@ -32,7 +36,7 @@ export default function CarnetDigitalCard({ jugador, equipo }) {
           C.C. {jugador?.cedula}
         </p>
         <p className="text-liga-amarillo text-sm font-bold drop-shadow-md">
-          CLUB: {equipo?.nombre || 'SIN EQUIPO'}
+          CLUB: {nombreEquipo}
         </p>
       </div>
 
@@ -41,13 +45,13 @@ export default function CarnetDigitalCard({ jugador, equipo }) {
         <img src={qrUrl} alt="QR Verificación" className="w-[70px] h-[70px]" />
       </div>
 
-      {/* 5. ESCUDO DEL CLUB */}
+      {/* 5. ESCUDO DEL CLUB (Con validación doble) */}
       <div className="absolute bottom-[10%] right-[5%] z-10 w-24 h-24 bg-white rounded-full p-1 flex items-center justify-center shadow-xl border-4 border-blue-900">
-        {equipo?.escudo_url ? (
-          <img src={equipo.escudo_url} alt="Escudo Club" className="w-full h-full object-contain rounded-full" />
+        {escudoUrl ? (
+          <img src={escudoUrl} alt="Escudo Club" className="w-full h-full object-contain rounded-full" />
         ) : (
           <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center text-blue-900 font-bold text-sm text-center">
-            {equipo?.nombre?.substring(0, 3).toUpperCase() || 'CLUB'}
+            {nombreEquipo.substring(0, 3).toUpperCase()}
           </div>
         )}
       </div>
