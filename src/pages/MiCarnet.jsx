@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { X, Printer, AlertTriangle, CheckCircle } from 'lucide-react'
-import escudoLiga from '../assets/escudo-liga.png'
 
 export default function MiCarnet() {
   const { usuario } = useAuth()
@@ -19,7 +18,6 @@ export default function MiCarnet() {
       if (!usuario) return
 
       try {
-        // Buscar al jugador vinculado a este usuario
         const { data, error: dbError } = await supabase
           .from('vista_carnet_jugador')
           .select('*')
@@ -189,8 +187,9 @@ export default function MiCarnet() {
                   )}
                 </div>
                 
-                <div className="absolute top-2 right-2 opacity-30 w-12 h-12 z-0">
-                  <img src={escudoLiga} alt="Liga" className="w-full h-full object-contain" />
+                {/* Sello de la liga reemplazado por texto para evitar error de importación */}
+                <div className="absolute top-2 right-2 opacity-30 z-0">
+                  <span className="text-white font-bold text-[10px]">LDBJI</span>
                 </div>
               </div>
             </div>
