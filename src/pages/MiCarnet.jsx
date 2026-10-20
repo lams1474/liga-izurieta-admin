@@ -1,13 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { X, Printer, AlertTriangle, CheckCircle } from 'lucide-react'
+import { X, Printer, AlertTriangle, CheckCircle, Shield } from 'lucide-react'
 
-// Importamos la imagen de fondo y el sello de la liga
+// Solo importamos la imagen de fondo
 import carnetFondo from '../assets/carnet-fondo.png'
-// Si tienes el sello de la liga, ponlo en src/assets/sello-liga.png
-// Si no lo tienes, no te preocupes, se usará un ícono por defecto
-import selloLigaDefault from '../assets/escudo-liga.png' 
 
 export default function MiCarnet() {
   const { usuario } = useAuth()
@@ -190,10 +187,9 @@ export default function MiCarnet() {
                   )}
                 </div>
                 
-                {/* 6. SELLO DE LA LIGA (Arriba a la Derecha) */}
-                <div className="absolute top-[5%] right-[3%] z-10 w-16 h-16 opacity-90">
-                  {/* Usamos la imagen por defecto o la que tengas */}
-                  <img src={selloLigaDefault} alt="Sello Liga" className="w-full h-full object-contain drop-shadow-md" />
+                {/* 6. SELLO DE LA LIGA (Arriba a la Derecha - Usando Ícono Vectorial) */}
+                <div className="absolute top-[5%] right-[3%] z-10 w-16 h-16 opacity-90 flex items-center justify-center bg-white/20 rounded-full border border-white/50 backdrop-blur-sm">
+                  <Shield size={32} className="text-white drop-shadow-md" />
                 </div>
               </div>
             </div>
