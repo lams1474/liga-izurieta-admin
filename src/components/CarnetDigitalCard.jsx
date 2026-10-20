@@ -1,134 +1,61 @@
-import { forwardRef } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
-import fondoCarnet from '../assets/carnet-fondo.png'
+import carnetFondo from '../assets/carnet-fondo.png'
+import selloLiga from '../assets/sello-liga.png'
 
-const CarnetDigitalCard = forwardRef(function CarnetDigitalCard({ jugador, equipo, validacion }, ref) {
-  if (!jugador) return null
-
-  const esHabilitado = validacion?.esHabilitado ?? false
-  const nombreCompleto = `${jugador.apellidos || ''} ${jugador.nombres || ''}`.trim()
-  const cedula = jugador.cedula || ''
-  const nombreClub = equipo?.nombre || 'Sin Club'
-  const escudoClub = equipo?.escudo_url
-
-  // URL pública para el QR
-  const urlVerificacion = `https://web-liga-izurieta.vercel.app/verificar?cedula=${cedula}`
-
-  // Lógica para ajustar el tamaño de la letra si el nombre es muy largo
-  const tamanoLetra = nombreCompleto.length > 22 ? 'text-[9px]' : 'text-[12px]'
+export default function CarnetDigitalCard({ jugador, equipo }) {
+  // Generamos la URL para el QR que apunta a la web pública
+  const urlVerificacion = `https://web-liga-izurieta.vercel.app/verificar?cedula=${jugador?.cedula}`
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(urlVerificacion)}`
 
   return (
-    <div
-      ref={ref}
-      className="carnet-card relative bg-white overflow-hidden shadow-xl rounded-lg"
-      style={{
-        width: '8.5cm',
-        height: '5.5cm',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}
-    >
-      {/* Fondo del carnet */}
-      <img
-        src={fondoCarnet}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover z-0"
-        crossOrigin="anonymous"
-      />
+    <div className="relative w-[600px] h-[400px] bg-blue-900 rounded-2xl shadow-2xl overflow-hidden mx-auto print:shadow-none print:rounded-none">
+      
+      {/* 1. IMAGEN DE FONDO */}
+      <img src={carnetFondo} alt="Fondo Carnet" className="absolute inset-0 w-full h-full object-cover z-0" />
 
-      {/* Contenido sobre el fondo */}
-      <div className="relative w-full h-full z-10">
-
-        {/* FOTO DEL JUGADOR (Izquierda Arriba) */}
-        <div
-          className="absolute bg-white rounded-sm border-2 border-white shadow-md overflow-hidden flex items-center justify-center"
-          style={{ top: '15%', left: '5%', width: '2.2cm', height: '2.6cm' }}
-        >
-          {jugador.foto_url ? (
-            <img
-              src={jugador.foto_url}
-              alt={nombreCompleto}
-              className="w-full h-full object-cover"
-              crossOrigin="anonymous"
-            />
-          ) : (
-            <div className="text-gray-400 text-xs text-center p-1">SIN FOTO</div>
-          )}
-        </div>
-
-        {/* NOMBRE DEL JUGADOR (Derecha Arriba) */}
-        <div 
-          className={`absolute font-black uppercase tracking-wide drop-shadow-md leading-tight text-white ${tamanoLetra}`}
-          style={{ top: '12%', left: '35%', width: '60%', maxWidth: '5.2cm' }}
-        >
-          {nombreCompleto}
-        </div>
-
-        {/* CÉDULA */}
-        <div className="absolute flex items-baseline gap-1" style={{ top: '30%', left: '35%' }}>
-          <span className="text-[10px] font-bold opacity-90 text-white">C.C.</span>
-          <span className="text-[12px] font-mono font-bold tracking-wider text-white drop-shadow-md">
-            {cedula}
-          </span>
-        </div>
-
-        {/* CLUB */}
-        <div className="absolute flex items-center gap-1" style={{ top: '42%', left: '35%', width: '60%' }}>
-          <span className="text-[10px] font-bold opacity-90 text-white">CLUB:</span>
-          <span className="text-[12px] font-black uppercase tracking-wide text-white drop-shadow-md truncate max-w-[2.8cm]">
-            {nombreClub}
-          </span>
-        </div>
-
-        {/* FIRMA DEL PRESIDENTE (Centro Abajo) */}
-        <div className="absolute flex flex-col items-center" style={{ bottom: '10%', left: '35%' }}>
-          <div className="font-serif italic text-[12px] text-white opacity-90 transform -rotate-3">
-            Luis Maigua
+      {/* 2. FOTO DEL JUGADOR */}
+      <div className="absolute top-[24%] left-[4%] w-[21%] h-[40%] bg-gray-200 border-2 border-white rounded shadow-md overflow-hidden z-10">
+        {jugador?.foto_url ? (
+          <img src={jugador.foto_url} alt="Jugador" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-300 text-gray-500 font-bold text-xs text-center p-1">
+            SIN FOTO
           </div>
-          <span className="text-[8px] font-bold text-liga-amarillo uppercase mt-0.5">
-            Presidente Liga
-          </span>
-        </div>
+        )}
+      </div>
 
-        {/* QR (Izquierda Abajo) */}
-        <div 
-          className="absolute bg-white p-[2px] rounded-sm z-20" 
-          style={{ bottom: '8%', left: '5%', width: '1.5cm', height: '1.5cm' }}
-        >
-          <QRCodeSVG value={urlVerificacion} size={60} level="M" className="w-full h-full" />
-        </div>
+      {/* 3. DATOS DEL JUGADOR (Cristal) */}
+      <div className="absolute top-[26%] left-[27%] right-[15%] z-10 bg-black/30 backdrop-blur-sm p-3 rounded-r-lg border-l-4 border-liga-amarillo shadow-lg">
+        <h3 className="text-white font-bold text-lg leading-tight mb-1 drop-shadow-md whitespace-nowrap overflow-hidden text-ellipsis">
+          {jugador?.apellidos} {jugador?.nombres}
+        </h3>
+        <p className="text-white text-sm font-mono mb-1 drop-shadow-md">
+          C.C. {jugador?.cedula}
+        </p>
+        <p className="text-liga-amarillo text-sm font-bold drop-shadow-md">
+          CLUB: {equipo?.nombre || 'SIN EQUIPO'}
+        </p>
+      </div>
 
-        {/* SELLO DEL CLUB Y ESTADO (Derecha Abajo) */}
-        <div className="absolute flex items-center gap-2" style={{ bottom: '10%', right: '5%' }}>
-          {/* Escudo del club */}
-          {escudoClub ? (
-            <img
-              src={escudoClub}
-              alt={nombreClub}
-              className="object-contain drop-shadow-lg bg-white rounded-full p-1 border border-gray-200"
-              style={{ width: '1.2cm', height: '1.2cm' }}
-              crossOrigin="anonymous"
-            />
-          ) : (
-            <div className="bg-white rounded-full flex items-center justify-center font-black text-liga-azul text-[10px] shadow-lg border border-gray-200" style={{ width: '1.2cm', height: '1.2cm' }}>
-              {nombreClub.substring(0, 3).toUpperCase()}
-            </div>
-          )}
+      {/* 4. CÓDIGO QR */}
+      <div className="absolute bottom-[10%] left-[4%] z-10 bg-white p-1 rounded shadow-sm">
+        <img src={qrUrl} alt="QR Verificación" className="w-[70px] h-[70px]" />
+      </div>
 
-          {/* Sello de verificación (Check / X) */}
-          {esHabilitado ? (
-            <div className="bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg border-2 border-white" style={{ width: '0.6cm', height: '0.6cm' }}>
-              <span className="text-[12px] font-bold">✓</span>
-            </div>
-          ) : (
-            <div className="bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg border-2 border-white" style={{ width: '0.6cm', height: '0.6cm' }}>
-              <span className="text-[12px] font-bold">✕</span>
-            </div>
-          )}
-        </div>
-
+      {/* 5. ESCUDO DEL CLUB */}
+      <div className="absolute bottom-[10%] right-[5%] z-10 w-24 h-24 bg-white rounded-full p-1 flex items-center justify-center shadow-xl border-4 border-blue-900">
+        {equipo?.escudo_url ? (
+          <img src={equipo.escudo_url} alt="Escudo Club" className="w-full h-full object-contain rounded-full" />
+        ) : (
+          <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center text-blue-900 font-bold text-sm text-center">
+            {equipo?.nombre?.substring(0, 3).toUpperCase() || 'CLUB'}
+          </div>
+        )}
+      </div>
+      
+      {/* 6. SELLO DE LA LIGA */}
+      <div className="absolute top-[5%] left-[3%] z-10 w-24 h-24 drop-shadow-lg">
+        <img src={selloLiga} alt="Sello Liga" className="w-full h-full object-contain" />
       </div>
     </div>
   )
-})
-
-export default CarnetDigitalCard
+}
