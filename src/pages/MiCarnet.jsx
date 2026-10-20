@@ -3,8 +3,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { X, Printer, AlertTriangle, CheckCircle } from 'lucide-react'
 
-// IMPORTAMOS TU IMAGEN DE FONDO
+// Importamos la imagen de fondo y el sello de la liga
 import carnetFondo from '../assets/carnet-fondo.png'
+// Si tienes el sello de la liga, ponlo en src/assets/sello-liga.png
+// Si no lo tienes, no te preocupes, se usará un ícono por defecto
+import selloLigaDefault from '../assets/escudo-liga.png' 
 
 export default function MiCarnet() {
   const { usuario } = useAuth()
@@ -126,7 +129,6 @@ export default function MiCarnet() {
         </div>
       ) : null}
 
-      {/* MODAL DEL CARNET */}
       {modalAbierto && carnet && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full overflow-hidden">
@@ -136,17 +138,16 @@ export default function MiCarnet() {
               <button onClick={() => setModalAbierto(false)} className="text-gray-400 hover:text-red-500"><X size={24} /></button>
             </div>
 
-            {/* Contenedor del Carnet */}
             <div className="p-6 flex justify-center bg-gray-100">
               <div 
                 ref={carnetRef} 
                 className="relative w-[600px] h-[400px] bg-blue-900 rounded-xl shadow-lg overflow-hidden"
               >
-                {/* 1. IMAGEN DE FONDO (La que subiste) */}
-                <img src={carnetFondo} alt="Fondo Carnet" className="absolute inset-0 w-full h-full object-cover" />
+                {/* 1. IMAGEN DE FONDO COMPLETA */}
+                <img src={carnetFondo} alt="Fondo Carnet" className="absolute inset-0 w-full h-full object-cover z-0" />
 
-                {/* 2. FOTO DEL JUGADOR (Izquierda) */}
-                <div className="absolute top-[25%] left-[5%] w-[22%] h-[40%] bg-gray-200 border-2 border-white rounded-md overflow-hidden shadow-lg z-10">
+                {/* 2. FOTO DEL JUGADOR (Ajustada a la izquierda) */}
+                <div className="absolute top-[25%] left-[4%] w-[22%] h-[42%] bg-gray-200 border-2 border-white rounded shadow-md overflow-hidden z-10">
                   {carnet.foto_url ? (
                     <img src={carnet.foto_url} alt="Jugador" className="w-full h-full object-cover" />
                   ) : (
@@ -156,21 +157,21 @@ export default function MiCarnet() {
                   )}
                 </div>
 
-                {/* 3. DATOS DEL JUGADOR (Al centro, evitando la firma) */}
-                <div className="absolute top-[30%] left-[32%] right-[15%] z-10">
-                  <h3 className="text-white font-bold text-xl leading-tight mb-2 text-shadow">
+                {/* 3. DATOS DEL JUGADOR (Texto blanco con sombra) */}
+                <div className="absolute top-[28%] left-[30%] right-[20%] z-10 text-white">
+                  <h3 className="font-bold text-xl leading-tight mb-2 drop-shadow-md">
                     {carnet.apellidos} {carnet.nombres}
                   </h3>
-                  <p className="text-white text-base font-mono mb-1 text-shadow">
+                  <p className="text-sm font-mono mb-1 drop-shadow-md">
                     C.C. {carnet.cedula}
                   </p>
-                  <p className="text-white text-base font-bold text-shadow">
+                  <p className="text-sm font-bold drop-shadow-md">
                     CLUB: {carnet.equipo}
                   </p>
                 </div>
 
                 {/* 4. CÓDIGO QR (Abajo a la Izquierda) */}
-                <div className="absolute bottom-[10%] left-[5%] z-10 bg-white p-1.5 rounded-md shadow-md">
+                <div className="absolute bottom-[12%] left-[4%] z-10 bg-white p-1 rounded shadow-sm">
                   <img 
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${carnet.token_carnet}`} 
                     alt="QR" 
@@ -179,14 +180,20 @@ export default function MiCarnet() {
                 </div>
 
                 {/* 5. ESCUDO DEL CLUB (Abajo a la Derecha) */}
-                <div className="absolute bottom-[10%] right-[8%] z-10 w-20 h-20 bg-white/90 rounded-full p-1 flex items-center justify-center shadow-lg border-2 border-liga-azul">
+                <div className="absolute bottom-[8%] right-[5%] z-10 w-20 h-20 bg-white rounded-full p-1 flex items-center justify-center shadow-lg border-2 border-liga-azul">
                   {carnet.escudo_url ? (
                     <img src={carnet.escudo_url} alt="Escudo Club" className="w-full h-full object-contain rounded-full" />
                   ) : (
-                    <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center text-blue-900 font-bold text-xs">
+                    <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-blue-900 font-bold text-xs">
                       {carnet.equipo?.substring(0, 3).toUpperCase()}
                     </div>
                   )}
+                </div>
+                
+                {/* 6. SELLO DE LA LIGA (Arriba a la Derecha) */}
+                <div className="absolute top-[5%] right-[3%] z-10 w-16 h-16 opacity-90">
+                  {/* Usamos la imagen por defecto o la que tengas */}
+                  <img src={selloLigaDefault} alt="Sello Liga" className="w-full h-full object-contain drop-shadow-md" />
                 </div>
               </div>
             </div>
