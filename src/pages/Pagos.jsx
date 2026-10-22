@@ -24,6 +24,10 @@ export default function Pagos() {
   const [modalDeudaEq, setModalDeudaEq] = useState(false)
   const [nuevaDeudaEq, setNuevaDeudaEq] = useState({ equipo_id: '', concepto: '', monto: '' })
 
+  // === NUEVO: ESTADOS PARA MULTA A JUGADOR ===
+  const [modalDeudaJugador, setModalDeudaJugador] = useState(false)
+  const [nuevaDeudaJugador, setNuevaDeudaJugador] = useState({ jugador_id: '', equipo_id: '', concepto: '', monto: '', fecha_vencimiento: '' })
+
   // === ESTADOS GENERALES DE COBRO ===
   const [monto, setMonto] = useState('')
   const [formaPago, setFormaPago] = useState('efectivo')
@@ -58,7 +62,7 @@ export default function Pagos() {
 
   // ============ BÚSQUEDA JUGADORES ============
   async function buscar(e) {
-    e.preventDefault()
+    if(e) e.preventDefault()
     if (!busqueda.trim()) return
     setBuscando(true)
     setBuscado(true)
@@ -92,7 +96,7 @@ export default function Pagos() {
         await supabase.from('deudas_jugador').update({ monto_pagado: parseFloat(monto) }).eq('id', conceptoSeleccionado.id)
       }
       toast.success('Pago registrado correctamente')
-      buscar({ preventDefault: () => {} })
+      buscar()
       setConceptoSeleccionado(null)
     } catch (err) {
       console.error(err)
@@ -125,6 +129,38 @@ export default function Pagos() {
     } catch (err) {
       console.error(err)
       toast.error('Error al crear deuda')
+    } finally {
+      setRegistrando(false)
+    }
+  }
+
+  // ============ NUEVO: CREAR DEUDA A JUGADOR ============
+  async function crearDeudaJugador(e) {
+    e.preventDefault()
+    if (!nuevaDeudaJugador.jugador_id || !nuevaDeudaJugador.equipo_id || !nuevaDeudaJugador.concepto || !nuevaDeudaJugador.monto) {
+      return toast.error('Llena todos los campos obligatorios')
+    }
+    
+    setRegistrando(true)
+    try {
+      const { error } = await supabase.from('deudas_jugador').insert({
+        jugador_id: nuevaDeudaJugador.jugador_id,
+        equipo_id: nuevaDeudaJugador.equipo_id,
+        concepto: nuevaDeudaJugador.concepto,
+        monto: parseFloat(nuevaDeudaJugador.monto),
+        monto_pagado: 0,
+        registrado_por: usuario.id,
+        fecha_vencimiento: nuevaDeudaJugador.fecha_vencimiento || null
+      })
+      if (error) throw error
+      
+      toast.success('Multa registrada al jugador')
+      setModalDeudaJugador(false)
+      setNuevaDeudaJugador({ jugador_id: '', equipo_id: '', concepto: '', monto: '', fecha_vencimiento: '' })
+      buscar() // Recargar resultados
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al crear multa al jugador')
     } finally {
       setRegistrando(false)
     }
@@ -196,11 +232,30 @@ export default function Pagos() {
 
                 return (
                   <div key={jugador.id} className="bg-white rounded-lg shadow-md border-l-4 border-liga-azul p-4">
-                    <div className="mb-4 pb-3 border-b">
-                      <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">{jugador.codigo_interno}</span>
-                      <h4 className="font-bold text-gray-800 text-lg mt-1">{jugador.apellidos} {jugador.nombres}</h4>
-                      <p className="text-sm text-gray-600">C.C. {jugador.cedula}</p>
-                      {equipo && <p className="text-xs text-gray-500 mt-1">🏟️ {equipo.nombre} ({equipo.disciplina} · {equipo.categoria})</p>}
+                    <div className="mb-4 pb-3 border-b flex justify-between items-start">
+                      <div>
+                        <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">{jugador.codigo_interno}</span>
+                        <h4 className="font-bold text-gray-800 text-lg mt-1">{jugador.apellidos} {jugador.nombres}</h4>
+                        <p className="text-sm text-gray-600">C.C. {jugador.cedula}</p>
+                        {equipo && <p className="text-xs text-gray-500 mt-1">🏟️ {equipo.nombre} ({equipo.disciplina} · {equipo.categoria})</p>}
+                      </div>
+                      {/* NUEVO BOTÓN PARA AÑADIR MULTA AL JUGADOR */}
+                      <button 
+                        onClick={() => {
+                          if (!equipo) return toast.error('El jugador no tiene un equipo activo asignado');
+                          setNuevaDeudaJugador({ 
+                            jugador_id: jugador.id, 
+                            equipo_id: equipo.id, 
+                            concepto: '', 
+                            monto: '', 
+                            fecha_vencimiento: '' 
+                          });
+                          setModalDeudaJugador(true);
+                        }}
+                        className="bg-orange-500 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-orange-600 flex items-center gap-1"
+                      >
+                        <Plus size={14} /> Añadir Multa
+                      </button>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-700 mb-2">Conceptos pendientes:</p>
@@ -334,6 +389,36 @@ export default function Pagos() {
               <button type="button" onClick={() => setModalDeudaEq(false)} disabled={registrando} className="flex-1 py-2 border rounded font-semibold text-gray-700">Cancelar</button>
               <button type="submit" disabled={registrando} className="flex-1 bg-liga-azul text-white py-2 rounded font-semibold disabled:opacity-50">
                 {registrando ? 'Guardando...' : 'Registrar Deuda'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ================= NUEVO: MODAL NUEVA DEUDA JUGADOR ================= */}
+      {modalDeudaJugador && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <form onSubmit={crearDeudaJugador} className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-liga-azul mb-1">Registrar Multa a Jugador</h3>
+            <p className="text-sm text-gray-500 mb-4 pb-4 border-b">Esta multa se sumará automáticamente a sus deudas pendientes.</p>
+            <div className="space-y-3 mb-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Concepto / Motivo</label>
+                <input required type="text" placeholder="Ej: Tarjeta Roja, Incomparecencia..." value={nuevaDeudaJugador.concepto} onChange={e => setNuevaDeudaJugador({...nuevaDeudaJugador, concepto: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Monto ($)</label>
+                <input required type="number" step="0.01" min="0.01" placeholder="Ej: 15.00" value={nuevaDeudaJugador.monto} onChange={e => setNuevaDeudaJugador({...nuevaDeudaJugador, monto: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha de Vencimiento (Opcional)</label>
+                <input type="date" value={nuevaDeudaJugador.fecha_vencimiento} onChange={e => setNuevaDeudaJugador({...nuevaDeudaJugador, fecha_vencimiento: e.target.value})} className="w-full px-3 py-2 border rounded-md text-gray-600" />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setModalDeudaJugador(false)} disabled={registrando} className="flex-1 py-2 border rounded font-semibold text-gray-700">Cancelar</button>
+              <button type="submit" disabled={registrando} className="flex-1 bg-orange-500 text-white py-2 rounded font-semibold disabled:opacity-50 hover:bg-orange-600">
+                {registrando ? 'Guardando...' : 'Registrar Multa'}
               </button>
             </div>
           </form>
