@@ -17,10 +17,10 @@ export default function Sanciones() {
 
   // === ESTADOS PARA CREAR SANCIONES ===
   const [modalSancionJugador, setModalSancionJugador] = useState(false)
-  const [nuevaSancionJugador, setNuevaSancionJugador] = useState({ cedula: '', jugador: null, motivo: '', tipo: 'roja_directa', fechas_sancion: 1 })
+  const [nuevaSancionJugador, setNuevaSancionJugador] = useState({ cedula: '', jugador: null, motivo: '', tipo: 'amarilla', fechas_sancion: 0 })
   
   const [modalSancionEquipo, setModalSancionEquipo] = useState(false)
-  const [nuevaSancionEquipo, setNuevaSancionEquipo] = useState({ equipo_id: '', motivo: '', tipo: 'multa_economica', fechas_sancion: 0, descripcion: '', monto: '' })
+  const [nuevaSancionEquipo, setNuevaSancionEquipo] = useState({ equipo_id: '', motivo: '', tipo: 'economica', fechas_sancion: 0, descripcion: '', monto: '' })
   
   const [equipos, setEquipos] = useState([])
   const [registrando, setRegistrando] = useState(false)
@@ -122,7 +122,7 @@ export default function Sanciones() {
       
       toast.success('Sanción a jugador registrada')
       setModalSancionJugador(false)
-      setNuevaSancionJugador({ cedula: '', jugador: null, motivo: '', tipo: 'roja_directa', fechas_sancion: 1 })
+      setNuevaSancionJugador({ cedula: '', jugador: null, motivo: '', tipo: 'amarilla', fechas_sancion: 0 })
       cargarDatos()
     } catch (err) {
       toast.error('Error al crear sanción: ' + err.message)
@@ -149,7 +149,7 @@ export default function Sanciones() {
       
       toast.success('Sanción a equipo registrada')
       setModalSancionEquipo(false)
-      setNuevaSancionEquipo({ equipo_id: '', motivo: '', tipo: 'multa_economica', fechas_sancion: 0, descripcion: '', monto: '' })
+      setNuevaSancionEquipo({ equipo_id: '', motivo: '', tipo: 'economica', fechas_sancion: 0, descripcion: '', monto: '' })
       cargarDatos()
     } catch (err) {
       toast.error('Error al crear sanción: ' + err.message)
@@ -374,11 +374,22 @@ export default function Sanciones() {
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Sanción</label>
-                    <select value={nuevaSancionJugador.tipo} onChange={e => setNuevaSancionJugador({...nuevaSancionJugador, tipo: e.target.value})} className="w-full px-3 py-2 border rounded-md">
-                      <option value="roja_directa">Roja Directa</option>
+                    <select 
+                      value={nuevaSancionJugador.tipo} 
+                      onChange={e => {
+                        const tipo = e.target.value;
+                        setNuevaSancionJugador({
+                          ...nuevaSancionJugador, 
+                          tipo,
+                          fechas_sancion: tipo === 'amarilla' ? 0 : nuevaSancionJugador.fechas_sancion
+                        });
+                      }} 
+                      className="w-full px-3 py-2 border rounded-md"
+                    >
+                      <option value="amarilla">Tarjeta Amarilla (Acumulativa)</option>
+                      <option value="roja">Tarjeta Roja</option>
                       <option value="doble_amarilla">Doble Amarilla</option>
-                      <option value="amarilla">Amarilla</option>
-                      <option value="otro">Otro</option>
+                      <option value="suspension_admin">Suspensión Administrativa</option>
                     </select>
                   </div>
                   <div>
@@ -386,8 +397,19 @@ export default function Sanciones() {
                     <input type="text" placeholder="Ej: Agresión, Reclamos..." value={nuevaSancionJugador.motivo} onChange={e => setNuevaSancionJugador({...nuevaSancionJugador, motivo: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Fechas de Sanción</label>
-                    <input required type="number" min="1" value={nuevaSancionJugador.fechas_sancion} onChange={e => setNuevaSancionJugador({...nuevaSancionJugador, fechas_sancion: e.target.value})} className="w-full px-3 py-2 border rounded-md" />
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Fechas de Sanción 
+                      {nuevaSancionJugador.tipo === 'amarilla' && <span className="text-xs text-orange-500 font-normal ml-1">(No suspende)</span>}
+                    </label>
+                    <input 
+                      required 
+                      type="number" 
+                      min={nuevaSancionJugador.tipo === 'amarilla' ? 0 : 1} 
+                      disabled={nuevaSancionJugador.tipo === 'amarilla'}
+                      value={nuevaSancionJugador.fechas_sancion} 
+                      onChange={e => setNuevaSancionJugador({...nuevaSancionJugador, fechas_sancion: e.target.value})} 
+                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100 disabled:text-gray-500" 
+                    />
                   </div>
                 </>
               )}
@@ -418,10 +440,9 @@ export default function Sanciones() {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Sanción</label>
                 <select value={nuevaSancionEquipo.tipo} onChange={e => setNuevaSancionEquipo({...nuevaSancionEquipo, tipo: e.target.value})} className="w-full px-3 py-2 border rounded-md">
-                  <option value="multa_economica">Multa Económica</option>
-                  <option value="perdida_puntos">Pérdida de Puntos</option>
-                  <option value="suspension_cancha">Suspensión de Cancha</option>
-                  <option value="otro">Otro</option>
+                  <option value="economica">Económica (Multa)</option>
+                  <option value="deportiva">Deportiva (Pérdida de puntos/canchas)</option>
+                  <option value="administrativa">Administrativa (Otros)</option>
                 </select>
               </div>
               <div>
