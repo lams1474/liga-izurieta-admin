@@ -43,7 +43,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
     return (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate()) ? edad - 1 : edad) < 18
   })()
 
-  // Cargar equipos (Ahora tanto para Admin como para Presidente)
+  // Cargar equipos (Admin y Presidente)
   useEffect(() => {
     async function cargarEquipos() {
       if (!esAdmin && !esPresidente) return
@@ -52,12 +52,9 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
       
       let equiposFiltrados = data || []
 
-      // Si es presidente, intentamos filtrar solo los equipos de su club.
-      // Asumiendo que usuario.club_id o usuario.equipo_id nos da su equipo principal.
       if (esPresidente && usuario) {
         const miEquipo = data?.find(eq => eq.id === usuario.club_id || eq.id === usuario.equipo_id)
         if (miEquipo) {
-          // Filtramos los equipos que tengan el mismo nombre (mismo club, otras categorías)
           equiposFiltrados = data.filter(eq => eq.nombre === miEquipo.nombre)
         }
       }
@@ -110,7 +107,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
         setForm(prev => ({
           ...prev, nombres: data.nombres || '', apellidos: data.apellidos || '', fecha_nacimiento: data.fecha_nacimiento || '',
           telefono: data.telefono || '', tutor_nombre: data.tutor_nombre || '', tutor_cedula: data.tutor_cedula || '', tutor_telefono: data.tutor_telefono || '',
-          equipo_id: '', dorsal: '', posicion: '' // Forzamos a que seleccione una nueva
+          equipo_id: '', dorsal: '', posicion: ''
         }))
         setConsentimiento(data.consentimiento_firmado || false)
         if (data.foto_url) setFotoActualUrl(data.foto_url)
@@ -175,7 +172,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
       if (!consentimiento) nuevosErrores.consentimiento = 'Debe autorizar el tratamiento'
     }
     
-    // Validamos equipo tanto para Admin como para Presidente
     if (!jugadorEditar && (esAdmin || esPresidente) && !form.equipo_id) {
       nuevosErrores.equipo_id = 'Obligatorio'
     }
@@ -192,7 +188,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
     try {
       if (jugadorEditar) {
-        // ============ EDITAR (Solo datos personales, NO toca equipos) ============
         const { error: errJugador } = await supabase.from('jugadores').update({
             nombres: form.nombres.toUpperCase().trim(), apellidos: form.apellidos.toUpperCase().trim(), cedula: form.cedula.trim(),
             fecha_nacimiento: form.fecha_nacimiento, telefono: form.telefono.trim() || null, tipo_pase: form.tipo_pase,
@@ -211,12 +206,10 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
         }
         toast.success('Datos personales actualizados')
       } else {
-        // ============ CREAR O AÑADIR A NUEVO EQUIPO ============
         let equipoFinal = form.equipo_id
         if (!equipoFinal) throw new Error('Debe seleccionar un equipo')
 
         if (jugadorExistente) {
-          // Verificar si ya está en este equipo
           const yaEnEquipo = jugadorExistente.inscripciones?.find(i => i.equipo?.id === equipoFinal && i.activo)
           if (yaEnEquipo) {
             throw new Error('El jugador YA está inscrito en este equipo en esta disciplina. Selecciona una categoría o disciplina diferente.')
@@ -235,7 +228,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
           }
           toast.success('Jugador sumado a la nueva nómina correctamente')
         } else {
-          // CREAR JUGADOR NUEVO
           const { data: nuevoJugador, error: errJugador } = await supabase.from('jugadores').insert({
               nombres: form.nombres.toUpperCase().trim(), apellidos: form.apellidos.toUpperCase().trim(), cedula: form.cedula.trim(),
               fecha_nacimiento: form.fecha_nacimiento, telefono: form.telefono.trim() || null, tipo_pase: form.tipo_pase,
@@ -397,7 +389,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
             </section>
           )}
 
-          {/* LOPDP RESTAURADO */}
+          {/* TEXTO LOPDP EXACTO Y COMPLETO */}
           {!jugadorExistente && (
             <section>
               <h3 className="text-sm font-bold text-liga-azul uppercase mb-3 pb-2 border-b">Consentimiento de Datos (LOPDP)</h3>
@@ -405,9 +397,13 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" checked={consentimiento} onChange={(e) => { setConsentimiento(e.target.checked); setErrores(prev => ({ ...prev, consentimiento: null })) }} className="mt-1 w-5 h-5 text-liga-azul rounded focus:ring-liga-azul flex-shrink-0" />
                   <div className="text-sm">
-                    <p className="font-semibold text-gray-800 mb-1">{esMenor ? 'Autorización del Tutor Legal' : 'Autorización del Jugador'}</p>
+                    <p className="font-semibold text-gray-800 mb-1">
+                      {esMenor ? 'Autorización del Tutor Legal' : 'Autorización del Jugador'}
+                    </p>
                     <p className="text-gray-600 text-xs leading-relaxed">
-                      {esMenor ? 'Declaro ser el tutor legal del jugador y AUTORIZO...' : 'AUTORIZO a la Liga Deportiva...'}
+                      {esMenor 
+                        ? 'Declaro ser el tutor legal del jugador y AUTORIZO a la Liga Deportiva Barrial José Ignacio Izurieta a recopilar, almacenar y tratar los datos personales del menor (nombres, cédula, fecha de nacimiento, fotografía) con la finalidad exclusiva de gestionar su participación en el campeonato, cumpliendo con la Ley Orgánica de Protección de Datos Personales.'
+                        : 'AUTORIZO a la Liga Deportiva Barrial José Ignacio Izurieta a recopilar, almacenar y tratar mis datos personales (nombres, cédula, fecha de nacimiento, fotografía) con la finalidad exclusiva de gestionar mi participación en el campeonato, cumpliendo con la Ley Orgánica de Protección de Datos Personales.'}
                     </p>
                   </div>
                 </label>
@@ -421,7 +417,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
               {jugadorExistente ? 'Inscribir en Nuevo Equipo' : jugadorEditar ? 'Inscripciones Actuales (Solo lectura)' : 'Datos Deportivos'}
             </h3>
 
-            {/* SI ESTÁ EDITANDO, MOSTRAMOS SUS EQUIPOS EN MODO LECTURA */}
             {jugadorEditar ? (
               <div className="bg-gray-50 p-3 rounded border border-gray-200 text-sm">
                 <p className="text-gray-500 mb-2">Este jugador pertenece a las siguientes nóminas:</p>
@@ -432,7 +427,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
               </div>
             ) : (
               <>
-                {/* AHORA EL SELECTOR ES PARA ADMIN Y PRESIDENTE */}
                 {(esAdmin || esPresidente) && (
                   <div className="mb-3">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Equipo / Disciplina *</label>
