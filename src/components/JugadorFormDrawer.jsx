@@ -43,14 +43,29 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
     return (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate()) ? edad - 1 : edad) < 18
   })()
 
+  // Cargar equipos (Ahora tanto para Admin como para Presidente)
   useEffect(() => {
     async function cargarEquipos() {
-      if (!esAdmin) return
+      if (!esAdmin && !esPresidente) return
+      
       const { data } = await supabase.from('equipos').select('id, nombre, disciplina, categoria').eq('activo', true).order('nombre')
-      setEquipos(data || [])
+      
+      let equiposFiltrados = data || []
+
+      // Si es presidente, intentamos filtrar solo los equipos de su club.
+      // Asumiendo que usuario.club_id o usuario.equipo_id nos da su equipo principal.
+      if (esPresidente && usuario) {
+        const miEquipo = data?.find(eq => eq.id === usuario.club_id || eq.id === usuario.equipo_id)
+        if (miEquipo) {
+          // Filtramos los equipos que tengan el mismo nombre (mismo club, otras categorías)
+          equiposFiltrados = data.filter(eq => eq.nombre === miEquipo.nombre)
+        }
+      }
+      
+      setEquipos(equiposFiltrados)
     }
     cargarEquipos()
-  }, [esAdmin])
+  }, [esAdmin, esPresidente, usuario])
 
   useEffect(() => {
     if (!abierto) return
@@ -59,7 +74,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
         nombres: jugadorEditar.nombres || '', apellidos: jugadorEditar.apellidos || '', cedula: jugadorEditar.cedula || '',
         fecha_nacimiento: jugadorEditar.fecha_nacimiento || '', telefono: jugadorEditar.telefono || '',
         tipo_pase: jugadorEditar.tipo_pase || 'nuevo', club_anterior: jugadorEditar.club_anterior || '',
-        equipo_id: '', dorsal: '', posicion: '', // No cargamos equipo_id en edición para no alterar sus inscripciones
+        equipo_id: '', dorsal: '', posicion: '',
         tutor_nombre: jugadorEditar.tutor_nombre || '', tutor_cedula: jugadorEditar.tutor_cedula || '', tutor_telefono: jugadorEditar.tutor_telefono || '',
       })
       setFotoActualUrl(jugadorEditar.foto_url || null)
@@ -160,8 +175,8 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
       if (!consentimiento) nuevosErrores.consentimiento = 'Debe autorizar el tratamiento'
     }
     
-    // Validamos equipo si es Admin o si es Presidente (aunque el presidente tiene fijo su club)
-    if (!jugadorEditar && esAdmin && !form.equipo_id) {
+    // Validamos equipo tanto para Admin como para Presidente
+    if (!jugadorEditar && (esAdmin || esPresidente) && !form.equipo_id) {
       nuevosErrores.equipo_id = 'Obligatorio'
     }
     
@@ -198,14 +213,13 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
       } else {
         // ============ CREAR O AÑADIR A NUEVO EQUIPO ============
         let equipoFinal = form.equipo_id
-        if (esPresidente && usuario.club_id) equipoFinal = usuario.club_id
         if (!equipoFinal) throw new Error('Debe seleccionar un equipo')
 
         if (jugadorExistente) {
           // Verificar si ya está en este equipo
           const yaEnEquipo = jugadorExistente.inscripciones?.find(i => i.equipo?.id === equipoFinal && i.activo)
           if (yaEnEquipo) {
-            throw new Error('El jugador YA está inscrito en este equipo en esta disciplina.')
+            throw new Error('El jugador YA está inscrito en este equipo en esta disciplina. Selecciona una categoría o disciplina diferente.')
           }
 
           const { error: errInscripcion } = await supabase.from('jugador_equipo').insert({
@@ -267,7 +281,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
   }
 
   if (!abierto) return null
-  const equipoDelPresidente = usuario?.club
   const fotoMostrar = previewFoto || fotoActualUrl
   const equiposActuales = jugadorExistente?.inscripciones?.filter(i => i.activo) || []
 
@@ -419,7 +432,8 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
               </div>
             ) : (
               <>
-                {esAdmin && (
+                {/* AHORA EL SELECTOR ES PARA ADMIN Y PRESIDENTE */}
+                {(esAdmin || esPresidente) && (
                   <div className="mb-3">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Equipo / Disciplina *</label>
                     <select value={form.equipo_id} onChange={(e) => actualizarCampo('equipo_id', e.target.value)} className={`w-full px-3 py-2 border rounded-md ${errores.equipo_id ? 'border-red-500' : 'border-gray-300'}`}>
@@ -427,17 +441,6 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
                       {equipos.map((eq) => <option key={eq.id} value={eq.id}>{eq.nombre} ({eq.disciplina} · {eq.categoria})</option>)}
                     </select>
                     {errores.equipo_id && <p className="text-xs text-red-500 mt-1">{errores.equipo_id}</p>}
-                  </div>
-                )}
-                
-                {/* RESTAURADO: EQUIPO FIJO PARA PRESIDENTES */}
-                {esPresidente && equipoDelPresidente && (
-                  <div className="mb-3">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Equipo</label>
-                    <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm">
-                      <strong>{equipoDelPresidente.nombre}</strong>
-                      <div className="text-xs text-blue-600">{equipoDelPresidente.disciplina} · {equipoDelPresidente.categoria}</div>
-                    </div>
                   </div>
                 )}
 
