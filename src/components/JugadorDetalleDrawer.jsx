@@ -122,7 +122,6 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
     }
   }
 
-  // Calificar y aprobar pase POR EQUIPO (Inscripción)
   async function cambiarCalificacionEquipo(inscripcionId, cal) {
     setGuardando(true)
     try {
@@ -174,11 +173,12 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
     if (!modalBaja) return;
     setGuardando(true)
     try {
+      // Solo inactiva la inscripción de este equipo
       await supabase.from('jugador_equipo').update({ activo: false }).eq('id', modalBaja.id)
       const hoy = new Date().toISOString().split('T')[0]
       await supabase.from('historial_clubes_jugador').update({ fecha_hasta: hoy }).eq('jugador_id', jugadorId).eq('equipo_id', modalBaja.equipo.id).is('fecha_hasta', null)
       
-      toast.success('Jugador dado de baja del equipo')
+      toast.success('Jugador dado de baja de esta nómina')
       setModalBaja(null)
       await cargarTodo()
       onCambio?.()
