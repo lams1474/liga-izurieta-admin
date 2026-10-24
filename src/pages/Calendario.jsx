@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext' // <-- Importado para saber el rol
 import { Calendar, Plus, Clock, MapPin, Pencil, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Calendario() {
+  const { usuario } = useAuth()
+  // Validamos si el usuario tiene permisos de administración
+  const esAdmin = usuario?.rol === 'admin' || usuario?.rol === 'secretaria'
+
   const [etapas, setEtapas] = useState([])
   const [fechas, setFechas] = useState([])
   const [partidos, setPartidos] = useState([])
@@ -213,12 +218,15 @@ export default function Calendario() {
           <h1 className="text-2xl font-bold text-liga-azul">Calendario y Partidos</h1>
           <p className="text-sm text-gray-500">Programa las jornadas del campeonato</p>
         </div>
-        <button
-          onClick={() => setModalEtapa(true)}
-          className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 flex items-center gap-2"
-        >
-          <Plus size={18} /> Nueva Etapa
-        </button>
+        {/* SOLO ADMIN PUEDE CREAR ETAPAS */}
+        {esAdmin && (
+          <button
+            onClick={() => setModalEtapa(true)}
+            className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 flex items-center gap-2"
+          >
+            <Plus size={18} /> Nueva Etapa
+          </button>
+        )}
       </div>
 
       {/* Selectores */}
@@ -250,14 +258,17 @@ export default function Calendario() {
                 <option key={f.id} value={f.id}>Fecha {f.numero} ({new Date(f.fecha_inicio + 'T00:00:00').toLocaleDateString()})</option>
               ))}
             </select>
-            <button
-              onClick={() => setModalFecha(true)}
-              disabled={!etapaSeleccionada}
-              className="bg-gray-200 text-gray-700 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50"
-              title="Añadir Fecha"
-            >
-              <Plus size={18} />
-            </button>
+            {/* SOLO ADMIN PUEDE AÑADIR FECHAS */}
+            {esAdmin && (
+              <button
+                onClick={() => setModalFecha(true)}
+                disabled={!etapaSeleccionada}
+                className="bg-gray-200 text-gray-700 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50"
+                title="Añadir Fecha"
+              >
+                <Plus size={18} />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -267,16 +278,19 @@ export default function Calendario() {
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="bg-liga-azul text-white p-4 flex justify-between items-center">
             <h3 className="font-bold">Partidos Programados</h3>
-            <button
-              onClick={() => {
-                setPartidoEditando(null)
-                setFormPartido({ hora: '', cancha: '', equipo_local_id: '', equipo_visitante_id: '', arbitro_id: '' })
-                setModalPartido(true)
-              }}
-              className="bg-liga-rojo text-white px-3 py-1.5 rounded text-sm font-semibold hover:bg-liga-rojo/90 flex items-center gap-1"
-            >
-              <Plus size={16} /> Programar Partido
-            </button>
+            {/* SOLO ADMIN PUEDE PROGRAMAR PARTIDOS */}
+            {esAdmin && (
+              <button
+                onClick={() => {
+                  setPartidoEditando(null)
+                  setFormPartido({ hora: '', cancha: '', equipo_local_id: '', equipo_visitante_id: '', arbitro_id: '' })
+                  setModalPartido(true)
+                }}
+                className="bg-liga-rojo text-white px-3 py-1.5 rounded text-sm font-semibold hover:bg-liga-rojo/90 flex items-center gap-1"
+              >
+                <Plus size={16} /> Programar Partido
+              </button>
+            )}
           </div>
 
           {partidos.length === 0 ? (
@@ -307,33 +321,35 @@ export default function Calendario() {
                     {p.visitante?.nombre}
                   </div>
 
-                  {/* BOTONES DE ACCIÓN */}
-                  <div className="flex items-center gap-1 sm:ml-4">
-                    <button
-                      onClick={() => {
-                        setPartidoEditando(p)
-                        setFormPartido({
-                          hora: p.hora || '',
-                          cancha: p.cancha || '',
-                          equipo_local_id: p.local?.id || '',
-                          equipo_visitante_id: p.visitante?.id || '',
-                          arbitro_id: p.arbitro?.id || ''
-                        })
-                        setModalPartido(true)
-                      }}
-                      className="p-2 text-blue-500 hover:bg-blue-50 rounded-md transition-colors"
-                      title="Editar partido"
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button
-                      onClick={() => eliminarPartido(p.id)}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                      title="Eliminar partido"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
+                  {/* BOTONES DE ACCIÓN (SOLO ADMIN) */}
+                  {esAdmin && (
+                    <div className="flex items-center gap-1 sm:ml-4">
+                      <button
+                        onClick={() => {
+                          setPartidoEditando(p)
+                          setFormPartido({
+                            hora: p.hora || '',
+                            cancha: p.cancha || '',
+                            equipo_local_id: p.local?.id || '',
+                            equipo_visitante_id: p.visitante?.id || '',
+                            arbitro_id: p.arbitro?.id || ''
+                          })
+                          setModalPartido(true)
+                        }}
+                        className="p-2 text-blue-500 hover:bg-blue-50 rounded-md transition-colors"
+                        title="Editar partido"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                      <button
+                        onClick={() => eliminarPartido(p.id)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                        title="Eliminar partido"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -475,7 +491,6 @@ export default function Calendario() {
           </form>
         </div>
       )}
-
     </div>
   )
 }
