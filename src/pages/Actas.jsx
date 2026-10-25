@@ -22,6 +22,7 @@ export default function Actas() {
   
   const [marcador, setMarcador] = useState({ local: 0, visitante: 0 })
   const [eventos, setEventos] = useState([]) 
+  const [firmas, setFirmas] = useState([]) // <-- NUEVO: Estado para las firmas
   const [modalAccion, setModalAccion] = useState(null) 
   const [novedades, setNovedades] = useState('')
 
@@ -65,7 +66,7 @@ export default function Actas() {
       const { data: rule } = await supabase.from('reglas_disciplina').select('min_jugadores, max_acta').eq('disciplina', partido.local.disciplina).eq('categoria', partido.local.categoria).single()
       setReglas(rule || { min_jugadores: 4, max_acta: 12 })
 
-      // 2. Cargar jugadores de AMBOS equipos (SIEMPRE, para que el PDF funcione)
+      // 2. Cargar jugadores de AMBOS equipos
       const cargarJugadores = async (equipoId) => {
         const { data: inscripciones } = await supabase.from('jugador_equipo').select(`dorsal, jugador:jugadores!jugador_equipo_jugador_id_fkey (id, apellidos, nombres, codigo_interno)`).eq('equipo_id', equipoId).eq('activo', true)
         const promesas = (inscripciones || []).filter(i => i.jugador).map(async (i) => {
@@ -78,7 +79,7 @@ export default function Actas() {
       setJugadoresLocal(await cargarJugadores(partido.local.id))
       setJugadoresVisitante(await cargarJugadores(partido.visitante.id))
 
-      // 3. Cargar la planilla guardada (SIEMPRE)
+      // 3. Cargar la planilla guardada
       const { data: planillaExistente } = await supabase.from('planilla_partido').select('*').eq('partido_id', partido.id)
       if (planillaExistente && planillaExistente.length > 0) {
         const planillaCargada = {}
@@ -86,7 +87,7 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
-      // 4. Cargar eventos (goles y tarjetas) con IDs
+      // 4. Cargar eventos (goles y tarjetas)
       const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
       const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
       
@@ -96,7 +97,15 @@ export default function Actas() {
       setEventos(evs)
       setMarcador({ local: partido.goles_local || 0, visitante: partido.goles_visitante || 0 })
 
-      // 5. Decidir qué pantalla mostrar
+      // 5. Cargar Firmas (NUEVO)
+      if (partido.acta && partido.acta.length > 0) {
+        const { data: firmasData } = await supabase.from('firmas_acta').select('*').eq('acta_id', partido.acta[0].id)
+        setFirmas(firmasData || [])
+      } else {
+        setFirmas([])
+      }
+
+      // 6. Decidir qué pantalla mostrar
       if (pestana === 'historial') setVista('ver_acta')
       else if (esCapitan) setVista('firmar_acta')
       else setVista('planilla')
@@ -109,7 +118,7 @@ export default function Actas() {
     }
   }
 
-  // ============ GENERAR PDF OFICIAL DE 2 PÁGINAS ============
+  // ============ GENERAR PDF OFICIAL DE 2 PÁGINAS (CON FIRMAS) ============
   function descargarPDF() {
     try {
       const doc = new jsPDF()
@@ -137,7 +146,7 @@ export default function Actas() {
       doc.setFont("helvetica", "normal")
       
       const fechaStr = new Date(p.fecha_inicio || Date.now()).toLocaleDateString()
-      doc.text(`VOCAL DE TURNO: ____________________`, 15, 45)
+      doc.text(`VOCAL DE TURNO: ${firmas.find(f => f.firmante_tipo === 'vocal') ? 'Firmado Digital' : '____________________'}`, 15, 45)
       doc.text(`CIUDAD: Pujilí`, 100, 45)
       doc.text(`FECHA: ${fechaStr}`, 145, 45)
       doc.text(`HORA: ${p.hora?.slice(0,5) || '________'}`, 15, 51)
@@ -148,7 +157,7 @@ export default function Actas() {
       doc.text(`CATEGORÍA: ${p.local.categoria.toUpperCase()}`, 100, 60)
 
       const filasLocal = jugadoresLocal
-        .filter(j => planilla[j.id]) // Solo los que están en la planilla
+        .filter(j => planilla[j.id])
         .map(j => {
           const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
           const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
@@ -274,36 +283,48 @@ export default function Actas() {
         doc.line(15, lineY + (i*8), 195, lineY + (i*8))
       }
 
-      const firmaY = Math.min(lineY + 40, 240)
-      doc.line(75, firmaY, 135, firmaY)
-      doc.setFont("helvetica", "bold")
-      doc.text('FIRMA DEL SR. ÁRBITRO', 105, firmaY + 5, { align: 'center' })
-
-      doc.setFont("helvetica", "normal")
-      doc.text('Acta aprobada el día: _____________________', 15, firmaY + 15)
-
-      const firmaY2 = firmaY + 25
-      doc.line(15, firmaY2, 60, firmaY2)
-      doc.line(75, firmaY2, 120, firmaY2)
-      doc.line(135, firmaY2, 180, firmaY2)
+      // ==================== FIRMAS (NUEVO) ====================
+      const firmaY = Math.min(lineY + 50, 220)
       
-      doc.setFont("helvetica", "bold")
+      const fArbitro = firmas.find(f => f.firmante_tipo === 'arbitro')
+      const fCapLocal = firmas.find(f => f.firmante_tipo === 'local')
+      const fCapVisitante = firmas.find(f => f.firmante_tipo === 'visitante')
+      const fVocal = firmas.find(f => f.firmante_tipo === 'vocal')
+
+      // Firmas Capitanes
+      if (fCapLocal?.firma_digital) doc.addImage(fCapLocal.firma_digital, 'PNG', 20, firmaY - 20, 40, 20)
+      if (fCapVisitante?.firma_digital) doc.addImage(fCapVisitante.firma_digital, 'PNG', 130, firmaY - 20, 40, 20)
+
+      doc.line(15, firmaY, 65, firmaY)
+      doc.line(135, firmaY, 185, firmaY)
       doc.setFontSize(8)
-      doc.text('FIRMA PRESIDENTE C.D.LDBJII', 37, firmaY2 + 4, { align: 'center' })
-      doc.text('FIRMA SECRETARIO C.D.LDBJII', 97, firmaY2 + 4, { align: 'center' })
-      doc.text('FIRMA VOCAL C.D.LDBJII', 157, firmaY2 + 4, { align: 'center' })
+      doc.setFont("helvetica", "bold")
+      doc.text(`CAPITÁN ${p.local.nombre}`, 40, firmaY + 4, { align: 'center' })
+      doc.text(`CAPITÁN ${p.visitante.nombre}`, 160, firmaY + 4, { align: 'center' })
+
+      // Firmas Arbitro y Vocal
+      const firmaY2 = firmaY + 30
+      if (fArbitro?.firma_digital) doc.addImage(fArbitro.firma_digital, 'PNG', 50, firmaY2 - 20, 40, 20)
+      if (fVocal?.firma_digital) doc.addImage(fVocal.firma_digital, 'PNG', 120, firmaY2 - 20, 40, 20)
+
+      doc.line(40, firmaY2, 100, firmaY2)
+      doc.line(110, firmaY2, 170, firmaY2)
+      doc.text('FIRMA DEL SR. ÁRBITRO', 70, firmaY2 + 4, { align: 'center' })
+      doc.text('FIRMA DEL VOCAL', 140, firmaY2 + 4, { align: 'center' })
 
       doc.setFontSize(8)
       doc.text('VIVE EL FUTBOL SIN DROGAS Y SIN ALCOHOL', 15, 285)
       doc.text('CAMPEONATO 2026', 170, 285)
 
       doc.save(`Acta_Oficial_${p.local?.nombre}_vs_${p.visitante?.nombre}.pdf`)
-      toast.success('PDF Oficial de 2 páginas descargado')
+      toast.success('PDF Oficial descargado con firmas')
     } catch (err) {
       console.error(err)
       toast.error('Error al generar PDF')
     }
   }
+
+  // ... (El resto del código de las vistas: toggleJugador, guardarPlanilla, registrarAccion, finalizarPartido, firmarActa, y los return de las vistas se mantienen igual que en tu archivo original) ...
 
   function toggleJugador(jugadorId, esLocal) {
     const jugadoresEquipo = esLocal ? jugadoresLocal : jugadoresVisitante
