@@ -33,7 +33,7 @@ funcionalidades según el rol del usuario.
 | Proyecto | URL | Descripción |
 |---|---|---|
 | Web Pública | [web-liga-izurieta.vercel.app](https://web-liga-izurieta.vercel.app) | Sitio público sin login |
-| Panel Admin | (pendiente deploy) | Este proyecto |
+| Panel Admin | [liga-izurieta-admin.vercel.app](https://liga-izurieta-admin.vercel.app) | Este proyecto |
 | App Móvil Vocal/Árbitro | (pendiente) | Aplicación offline-first |
 
 ---
@@ -56,13 +56,50 @@ funcionalidades según el rol del usuario.
 | 10 | Módulo Actas | ✅ Completado |
 | 11 | Módulo Reportes | ✅ Completado |
 | 12 | Módulo Presidente (Mis Jugadores) | ✅ Completado |
-| 13 | Deploy en Vercel | ⏳ Listo para producción |
+| 13 | Deploy en Vercel | ✅ Desplegado |
 
 ---
 
 ## 🎯 Módulos
 
-### Módulo Jugadores ✅
+### Módulo Jugadores y Carnet Digital ✅
+
+**Funcionalidades:**
+- Lista de jugadores con búsqueda y filtros por disciplina, categoría, equipo y estado.
+- Registro y edición completa de datos personales y deportivos.
+- Firma y gestión de Consentimiento de Datos Personales (LOPDP).
+- Generación de Carnet Digital Oficial con formato estándar CR80, foto de perfil, estado de habilitación, código de barras y firma digital.
+- Validación automática de estado del carnet (pago registrado, consentimiento firmado, sin deudas o sanciones activas y pase aprobado).
+- Cambio de club e historial deportivo automático.
+- Dar de baja del club con mantenimiento de historial.
+
+### Módulo Equipos y Clubes ✅
+
+- Gestión de clubes con disciplinas (Fútbol, Futsala) y categorías (Máster, Abierta, Femenino).
+- Asignación de presidente y delegado del equipo.
+- Control de estado activo del club y nómina de jugadores.
+
+### Módulo Pagos y Tesorería ✅
+
+- Registro de pagos de carnet digital con habilitación automática del jugador.
+- Cobros a clubes y jugadores: Inscripciones, Cuotas Mensuales, Cuotas Anuales de Afiliación, y Multas Reglamentarias.
+- Gestión de deudas y saldos pendientes con abonos parciales.
+
+### Módulo Calendario de Partidos ✅
+
+- Programación y visualización de partidos por fecha, hora, cancha y categoría.
+- Control de partidos jugados, programados y suspendidos.
+
+### Módulo Sanciones y Disciplina ✅
+
+- Registro de tarjetas amarillas, rojas y suspensiones administrativas.
+- Búsqueda automática de la inscripción activa del jugador para evitar inconsistencias.
+- Generación automática de multas reglamentarias e integración con deudas.
+
+### Módulo Actas y Reportes ✅
+
+- Generación de actas oficiales de partidos con control de vocalía y arbitraje.
+- Exportación e impresión de reportes institucionales y estadísticas.
 
 **Funcionalidades:**
 - Lista de jugadores con búsqueda y filtros (por disciplina, categoría, equipo, estado)
@@ -144,17 +181,30 @@ liga-izurieta-admin/
 │   │   ├── Sidebar.jsx              # Menú lateral por rol
 │   │   ├── Layout.jsx               # Envoltorio general
 │   │   ├── ProtectedRoute.jsx       # Protección de rutas
+│   │   ├── CarnetDigitalCard.jsx    # Credencial digital oficial CR80
+│   │   ├── EquipoFormDrawer.jsx     # Formulario crear/editar equipo
 │   │   ├── JugadorFormDrawer.jsx    # Formulario crear/editar jugador
-│   │   └── JugadorDetalleDrawer.jsx # Detalle completo del jugador
+│   │   ├── JugadorDetalleDrawer.jsx # Detalle completo, pase, calificar y consentimiento
+│   │   ├── PeriodoInscripcionDrawer.jsx # Configuración de periodo de pases
+│   │   └── UsuarioFormDrawer.jsx    # Crear/editar usuarios
 │   ├── contexts/
-│   │   └── AuthContext.jsx          # Manejo de autenticación
+│   │   └── AuthContext.jsx          # Manejo de autenticación y roles
 │   ├── lib/
 │   │   └── supabase.js              # Cliente de Supabase
 │   ├── pages/
 │   │   ├── Login.jsx                # Inicio de sesión
-│   │   ├── Dashboard.jsx            # Página principal
-│   │   ├── Jugadores.jsx            # Lista de jugadores
-│   │   └── ImportarJugadores.jsx    # Importación masiva
+│   │   ├── Dashboard.jsx            # Panel principal con resumen
+│   │   ├── Jugadores.jsx            # Gestión de jugadores
+│   │   ├── MisJugadores.jsx         # Panel de delegado / presidente
+│   │   ├── MiCarnet.jsx             # Portal del jugador y carnet digital
+│   │   ├── Equipos.jsx              # Gestión de clubes
+│   │   ├── Pagos.jsx                # Tesorería, pagos de carnet y deudas/multas
+│   │   ├── Calendario.jsx           # Calendario de encuentros
+│   │   ├── Sanciones.jsx            # Módulo disciplinario
+│   │   ├── Actas.jsx                # Control de actas y vocales
+│   │   ├── Reportes.jsx             # Informes e impresiones
+│   │   ├── Usuarios.jsx             # Administración de usuarios
+│   │   └── ImportarJugadores.jsx    # Carga masiva desde Excel
 │   ├── App.jsx                      # Rutas principales
 │   ├── main.jsx                     # Punto de entrada
 │   └── index.css                    # Estilos globales
