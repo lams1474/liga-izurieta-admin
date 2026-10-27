@@ -15,7 +15,7 @@ export default function Actas() {
   const [partidoSeleccionado, setPartidoSeleccionado] = useState(null)
   
   const [vista, setVista] = useState('lista')
-  const [reglas, setReglas] = useState({ min_jugadores: 7, max_acta: 19 }) // Valores por defecto para Fútbol
+  const [reglas, setReglas] = useState({ min_jugadores: 7, max_acta: 19 })
   const [jugadoresLocal, setJugadoresLocal] = useState([])
   const [jugadoresVisitante, setJugadoresVisitante] = useState([])
   const [planilla, setPlanilla] = useState({})
@@ -62,12 +62,8 @@ export default function Actas() {
     setCargando(true)
 
     try {
-      // Determinar si es fútbol o futsal para las reglas
       const esFutbol = partido.local.disciplina === 'futbol'
-      const reglasPorDefecto = esFutbol 
-        ? { min_jugadores: 7, max_acta: 19 } 
-        : { min_jugadores: 4, max_acta: 12 }
-
+      const reglasPorDefecto = esFutbol ? { min_jugadores: 7, max_acta: 19 } : { min_jugadores: 4, max_acta: 12 }
       const { data: rule } = await supabase.from('reglas_disciplina').select('min_jugadores, max_acta').eq('disciplina', partido.local.disciplina).eq('categoria', partido.local.categoria).single()
       setReglas(rule || reglasPorDefecto)
 
@@ -118,15 +114,16 @@ export default function Actas() {
     }
   }
 
-  // ============ GENERAR PDF OFICIAL ============
+  // ============ GENERAR PDF OFICIAL (A PRUEBA DE BALAS) ============
   function descargarPDF() {
     try {
       const doc = new jsPDF()
       const p = partidoSeleccionado
       
-      const cleanText = (str) => {
+      // Función extrema de limpieza: Elimina cualquier cosa que no sea letra o número
+      const sanitize = (str) => {
         if (!str) return '';
-        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return String(str).replace(/[^a-zA-Z0-9 ]/g, '');
       }
 
       const dibujarEncabezado = (pagina) => {
@@ -155,14 +152,14 @@ export default function Actas() {
       doc.text(`HORA: ${p.hora?.slice(0,5) || '________'}`, 15, 51)
 
       doc.setFont("helvetica", "bold")
-      doc.text(`CLUB: ${cleanText(p.local?.nombre?.toUpperCase())}`, 15, 60)
-      doc.text(`CATEGORIA: ${cleanText(p.local?.categoria?.toUpperCase())}`, 100, 60)
+      doc.text(`CLUB: ${sanitize(p.local?.nombre?.toUpperCase())}`, 15, 60)
+      doc.text(`CATEGORIA: ${sanitize(p.local?.categoria?.toUpperCase())}`, 100, 60)
 
       const filasLocal = jugadoresLocal.filter(j => planilla[j.id]).map(j => {
         const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
         const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
         const rojas = eventos.filter(e => e.tipo === 'roja' && e.jugador_id === j.id).length
-        return [j.dorsal || '-', cleanText(`${j.apellidos} ${j.nombres}`), goles > 0 ? goles.toString() : '', amarillas > 0 ? 'X' : '', rojas > 0 ? 'X' : '']
+        return [j.dorsal || '-', sanitize(`${j.apellidos} ${j.nombres}`), goles > 0 ? goles.toString() : '', amarillas > 0 ? 'X' : '', rojas > 0 ? 'X' : '']
       })
 
       autoTable(doc, {
@@ -177,14 +174,14 @@ export default function Actas() {
 
       let finalY = doc.lastAutoTable.finalY + 10
       doc.setFont("helvetica", "bold")
-      doc.text(`CLUB: ${cleanText(p.visitante?.nombre?.toUpperCase())}`, 15, finalY)
-      doc.text(`CATEGORIA: ${cleanText(p.visitante?.categoria?.toUpperCase())}`, 100, finalY)
+      doc.text(`CLUB: ${sanitize(p.visitante?.nombre?.toUpperCase())}`, 15, finalY)
+      doc.text(`CATEGORIA: ${sanitize(p.visitante?.categoria?.toUpperCase())}`, 100, finalY)
 
       const filasVisitante = jugadoresVisitante.filter(j => planilla[j.id]).map(j => {
         const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
         const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
         const rojas = eventos.filter(e => e.tipo === 'roja' && e.jugador_id === j.id).length
-        return [j.dorsal || '-', cleanText(`${j.apellidos} ${j.nombres}`), goles > 0 ? goles.toString() : '', amarillas > 0 ? 'X' : '', rojas > 0 ? 'X' : '']
+        return [j.dorsal || '-', sanitize(`${j.apellidos} ${j.nombres}`), goles > 0 ? goles.toString() : '', amarillas > 0 ? 'X' : '', rojas > 0 ? 'X' : '']
       })
 
       autoTable(doc, {
@@ -202,7 +199,7 @@ export default function Actas() {
       doc.setFontSize(9)
       doc.setFont("helvetica", "normal")
       
-      const nombreArbitro = p.arbitro ? `${cleanText(p.arbitro.nombres)} ${cleanText(p.arbitro.apellidos)}` : '________________________'
+      const nombreArbitro = p.arbitro ? `${sanitize(p.arbitro.nombres)} ${sanitize(p.arbitro.apellidos)}` : '________________________'
       doc.text(`NOMBRE DEL SR. ARBITRO: ${nombreArbitro}`, 15, 45)
 
       const tarjetasLocal = eventos.filter(ev => (ev.tipo === 'amarilla' || ev.tipo === 'roja') && ev.equipo_id === p.local.id)
@@ -210,7 +207,7 @@ export default function Actas() {
 
       const dibujarSeccionTarjetas = (startY, nombreClub, tarjetas) => {
         doc.setFont("helvetica", "bold")
-        doc.text(`TARJETAS DEL CLUB: ${cleanText(nombreClub.toUpperCase())}`, 15, startY)
+        doc.text(`TARJETAS DEL CLUB: ${sanitize(nombreClub.toUpperCase())}`, 15, startY)
         let yAmarillas = startY + 6
         let yRojas = startY + 45
 
@@ -222,8 +219,8 @@ export default function Actas() {
           doc.text(`NO. ______`, 15, yAmarillas + (i*6))
           doc.line(35, yAmarillas + (i*6), 130, yAmarillas + (i*6))
           if (amarillas[i]) {
-            doc.text(cleanText(amarillas[i].jugador), 37, yAmarillas + (i*6) - 1)
-            doc.text(`POR: ${cleanText(amarillas[i].motivo || '______')}`, 135, yAmarillas + (i*6))
+            doc.text(sanitize(amarillas[i].jugador), 37, yAmarillas + (i*6) - 1)
+            doc.text(`POR: ${sanitize(amarillas[i].motivo || '______')}`, 135, yAmarillas + (i*6))
           } else {
             doc.text(`POR: ________________`, 135, yAmarillas + (i*6))
           }
@@ -238,8 +235,8 @@ export default function Actas() {
           doc.text(`NO. ______`, 15, yRojas + (i*6))
           doc.line(35, yRojas + (i*6), 130, yRojas + (i*6))
           if (rojas[i]) {
-            doc.text(cleanText(rojas[i].jugador), 37, yRojas + (i*6) - 1)
-            doc.text(`POR: ${cleanText(rojas[i].motivo || '______')}`, 135, yRojas + (i*6))
+            doc.text(sanitize(rojas[i].jugador), 37, yRojas + (i*6) - 1)
+            doc.text(`POR: ${sanitize(rojas[i].motivo || '______')}`, 135, yRojas + (i*6))
           } else {
             doc.text(`POR: ________________`, 135, yRojas + (i*6))
           }
@@ -254,7 +251,7 @@ export default function Actas() {
       doc.setFont("helvetica", "bold")
       doc.text('NOVEDADES:', 15, nextY)
       doc.setFont("helvetica", "normal")
-      const splitText = doc.splitTextToSize(cleanText(p.acta?.[0]?.observaciones || 'Sin novedades registradas.'), 175)
+      const splitText = doc.splitTextToSize(sanitize(p.acta?.[0]?.observaciones || 'Sin novedades registradas.'), 175)
       doc.text(splitText, 15, nextY + 6)
       
       let lineY = nextY + 6 + (splitText.length * 5) + 10
@@ -270,7 +267,8 @@ export default function Actas() {
       const drawImageSafely = (base64, x, y, w, h) => {
         try {
           if (!base64) return;
-          const cleanB64 = base64.includes(',') ? base64.split(',')[1] : base64;
+          // Limpiamos cualquier prefijo o espacio que rompa jsPDF
+          const cleanB64 = base64.replace(/^data:image\/(png|jpeg|jpg);base64,/, '').replace(/\s/g, '');
           doc.addImage(cleanB64, "png", x, y, w, h, undefined, 'FAST');
         } catch (e) {
           console.error("Error al dibujar firma en PDF", e);
@@ -279,9 +277,9 @@ export default function Actas() {
 
       const xPositions = [15, 65, 115, 165];
       const firmantes = [
-        { nombre: 'CAPITÁN LOCAL', firma: fCapLocal },
-        { nombre: 'CAPITÁN VISITANTE', firma: fCapVisitante },
-        { nombre: 'ÁRBITRO', firma: fArbitro },
+        { nombre: 'CAPITAN LOCAL', firma: fCapLocal },
+        { nombre: 'CAPITAN VISITANTE', firma: fCapVisitante },
+        { nombre: 'ARBITRO', firma: fArbitro },
         { nombre: 'VOCAL', firma: fVocal }
       ];
 
@@ -298,8 +296,8 @@ export default function Actas() {
       doc.text('VIVE EL FUTBOL SIN DROGAS Y SIN ALCOHOL', 15, 285)
       doc.text('CAMPEONATO 2026', 170, 285)
 
-      const nombreLocal = p.local?.nombre?.replace(/[^a-zA-Z0-9]/g, '') || 'Local';
-      const nombreVisitante = p.visitante?.nombre?.replace(/[^a-zA-Z0-9]/g, '') || 'Visitante';
+      const nombreLocal = sanitize(p.local?.nombre) || 'Local';
+      const nombreVisitante = sanitize(p.visitante?.nombre) || 'Visitante';
       
       doc.save(`Acta_${nombreLocal}_vs_${nombreVisitante}.pdf`)
       toast.success('PDF Oficial descargado')
@@ -334,7 +332,7 @@ export default function Actas() {
     const titularesVisitante = Object.entries(planilla).filter(([id, rol]) => rol === 'titular' && jugadoresVisitante.some(j => j.id === id)).length
     
     if ((titularesLocal < reglas.min_jugadores || titularesVisitante < reglas.min_jugadores) && iniciarPartido) {
-      return toast.error(`No puedes iniciar el partido sin el mínimo de jugadores (${reglas.min_jugadores} por equipo). Si un equipo no se presentó, usa la opción de incomparecencia.`)
+      return toast.error(`No puedes iniciar el partido sin el mínimo de jugadores (${reglas.min_jugadores} por equipo).`)
     }
 
     setGuardando(true)
@@ -428,6 +426,7 @@ export default function Actas() {
 
   if (cargando && vista === 'lista') return <div className="p-8 text-center">Cargando...</div>
 
+  // ... (El resto de las vistas de JSX se mantienen igual) ...
   if (vista === 'lista') {
     return (
       <div className="max-w-4xl mx-auto">
