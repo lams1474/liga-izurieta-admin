@@ -141,8 +141,13 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
   async function cambiarEstadoPaseEquipo(inscripcionId, nuevoEstado) {
     setGuardando(true)
     try {
-      const { error } = await supabase.from('jugador_equipo').update({ estado_pase: nuevoEstado }).eq('id', inscripcionId)
-      if (error) throw error
+      // Actualizamos la inscripción específica del equipo
+      const { error: err1 } = await supabase.from('jugador_equipo').update({ estado_pase: nuevoEstado }).eq('id', inscripcionId)
+      if (err1) throw err1
+
+      // También actualizamos el estado general del jugador (por si acaso la interfaz lee de ahí)
+      await supabase.from('jugadores').update({ estado_pase: nuevoEstado }).eq('id', jugadorId)
+
       toast.success(`Pase ${nuevoEstado}`)
       await cargarTodo()
       onCambio?.()
@@ -174,7 +179,6 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
     
     setGuardando(true);
     try {
-      // Verificamos si tiene eventos o sanciones para no borrar historial
       const { count: eventosCount } = await supabase.from('goles').select('*', { count: 'exact', head: true }).eq('jugador_id', jugadorId);
       const { count: sancionesCount } = await supabase.from('sanciones_jugador').select('*', { count: 'exact', head: true }).eq('jugador_id', jugadorId);
       
@@ -182,7 +186,6 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
         throw new Error('No se puede eliminar: el jugador ya tiene historial (goles o tarjetas). Usa el botón "Inactivar Jugador" en su lugar.');
       }
 
-      // Si no tiene historial, borramos sus inscripciones y luego al jugador
       await supabase.from('jugador_equipo').delete().eq('jugador_id', jugadorId);
       await supabase.from('historial_clubes_jugador').delete().eq('jugador_id', jugadorId);
       
@@ -450,13 +453,8 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
                     <Power size={16} /> {jugador.activo ? 'Inactivar Jugador Globalmente' : 'Activar Jugador Globalmente'}
                   </button>
                 )}
-                {/* NUEVO BOTÓN DE ELIMINAR */}
                 {esAdmin && (
-                  <button 
-                    onClick={eliminarJugador} 
-                    disabled={guardando} 
-                    className="px-4 py-2 rounded-md text-sm font-semibold flex items-center gap-2 bg-gray-800 text-white hover:bg-black transition-colors"
-                  >
+                  <button onClick={eliminarJugador} disabled={guardando} className="px-4 py-2 rounded-md text-sm font-semibold flex items-center gap-2 bg-gray-800 text-white hover:bg-black transition-colors">
                     <Trash2 size={16} /> Eliminar Jugador
                   </button>
                 )}
@@ -466,7 +464,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
         )}
       </div>
 
-      {/* MODAL: Registrar pago */}
+      {/* MODALES (Pago, Baja, Carnet) se mantienen igual */}
       {modalPago && (
         <>
           <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalPago(false)} />
@@ -485,7 +483,6 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
         </>
       )}
 
-      {/* MODAL: Dar de baja INSCRIPCIÓN ESPECÍFICA */}
       {modalBaja && (
         <>
           <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalBaja(null)} />
@@ -506,7 +503,6 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
         </>
       )}
 
-      {/* MODAL: Carnet Digital */}
       {modalCarnet && (
         <>
           <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalCarnet(false)} />
