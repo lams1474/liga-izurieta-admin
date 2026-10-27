@@ -15,18 +15,18 @@ export default function Actas() {
   const [partidoSeleccionado, setPartidoSeleccionado] = useState(null)
   
   const [vista, setVista] = useState('lista')
-  const [reglas, setReglas] = useState({ min_jugadores: 4, max_acta: 12 })
+  const [reglas, setReglas] = useState({ min_jugadores: 7, max_acta: 19 }) // Valores por defecto para Fútbol
   const [jugadoresLocal, setJugadoresLocal] = useState([])
   const [jugadoresVisitante, setJugadoresVisitante] = useState([])
   const [planilla, setPlanilla] = useState({})
   
   const [marcador, setMarcador] = useState({ local: 0, visitante: 0 })
   const [eventos, setEventos] = useState([]) 
-  const [firmas, setFirmas] = useState([]) // <-- NUEVO: Estado para las firmas
+  const [firmas, setFirmas] = useState([]) 
   const [modalAccion, setModalAccion] = useState(null) 
   const [novedades, setNovedades] = useState('')
-
   const [guardando, setGuardando] = useState(false)
+  
   const esCapitan = usuario?.rol === 'capitan'
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function Actas() {
       let query = supabase.from('partidos').select(`
         id, hora, cancha, fecha_id, jugado, goles_local, goles_visitante,
         local:equipos!partidos_equipo_local_id_fkey (id, nombre, disciplina, categoria),
-        visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre),
+        visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina),
         fecha:fechas (numero, etapa:etapas(nombre)),
         arbitro:arbitros (nombres, apellidos),
         acta:actas (id, estado, observaciones)
@@ -62,11 +62,15 @@ export default function Actas() {
     setCargando(true)
 
     try {
-      // 1. Cargar reglas
-      const { data: rule } = await supabase.from('reglas_disciplina').select('min_jugadores, max_acta').eq('disciplina', partido.local.disciplina).eq('categoria', partido.local.categoria).single()
-      setReglas(rule || { min_jugadores: 4, max_acta: 12 })
+      // Determinar si es fútbol o futsal para las reglas
+      const esFutbol = partido.local.disciplina === 'futbol'
+      const reglasPorDefecto = esFutbol 
+        ? { min_jugadores: 7, max_acta: 19 } 
+        : { min_jugadores: 4, max_acta: 12 }
 
-      // 2. Cargar jugadores de AMBOS equipos
+      const { data: rule } = await supabase.from('reglas_disciplina').select('min_jugadores, max_acta').eq('disciplina', partido.local.disciplina).eq('categoria', partido.local.categoria).single()
+      setReglas(rule || reglasPorDefecto)
+
       const cargarJugadores = async (equipoId) => {
         const { data: inscripciones } = await supabase.from('jugador_equipo').select(`dorsal, jugador:jugadores!jugador_equipo_jugador_id_fkey (id, apellidos, nombres, codigo_interno)`).eq('equipo_id', equipoId).eq('activo', true)
         const promesas = (inscripciones || []).filter(i => i.jugador).map(async (i) => {
@@ -79,7 +83,6 @@ export default function Actas() {
       setJugadoresLocal(await cargarJugadores(partido.local.id))
       setJugadoresVisitante(await cargarJugadores(partido.visitante.id))
 
-      // 3. Cargar la planilla guardada
       const { data: planillaExistente } = await supabase.from('planilla_partido').select('*').eq('partido_id', partido.id)
       if (planillaExistente && planillaExistente.length > 0) {
         const planillaCargada = {}
@@ -87,17 +90,15 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
-      // 4. Cargar eventos (goles y tarjetas)
       const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
       const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
       
       let evs = []
       if (goles) goles.forEach(g => evs.push({ tipo: 'gol', jugador_id: g.jugador.id, jugador: `${g.jugador.apellidos} ${g.jugador.nombres}`, equipo_id: null }))
-      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador_id: t.jugador.id, jugador: `${t.jugador.apellidos} ${t.jugador.nombres}`, equipo_id: t.equipo.id }))
+      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador_id: t.jugador.id, jugador: `${t.jugador.apellidos} ${t.jugador.nombres}`, equipo_id: t.equipo.id, motivo: t.motivo }))
       setEventos(evs)
       setMarcador({ local: partido.goles_local || 0, visitante: partido.goles_visitante || 0 })
 
-      // 5. Cargar Firmas (NUEVO)
       if (partido.acta && partido.acta.length > 0) {
         const { data: firmasData } = await supabase.from('firmas_acta').select('*').eq('acta_id', partido.acta[0].id)
         setFirmas(firmasData || [])
@@ -105,7 +106,6 @@ export default function Actas() {
         setFirmas([])
       }
 
-      // 6. Decidir qué pantalla mostrar
       if (pestana === 'historial') setVista('ver_acta')
       else if (esCapitan) setVista('firmar_acta')
       else setVista('planilla')
@@ -118,12 +118,17 @@ export default function Actas() {
     }
   }
 
-  // ============ GENERAR PDF OFICIAL DE 2 PÁGINAS (CON FIRMAS) ============
+  // ============ GENERAR PDF OFICIAL ============
   function descargarPDF() {
     try {
       const doc = new jsPDF()
       const p = partidoSeleccionado
       
+      const cleanText = (str) => {
+        if (!str) return '';
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      }
+
       const dibujarEncabezado = (pagina) => {
         doc.setFont("helvetica", "bold")
         doc.setFontSize(14)
@@ -136,40 +141,29 @@ export default function Actas() {
         doc.line(15, 28, 195, 28)
         doc.setFont("helvetica", "bold")
         doc.setFontSize(12)
-        doc.text(`ACTA DE JUEGO - PÁGINA ${pagina}`, 105, 35, { align: 'center' })
+        doc.text(`ACTA DE JUEGO - PAGINA ${pagina}`, 105, 35, { align: 'center' })
       }
 
-      // ==================== PÁGINA 1: PLANILLA DE JUGADORES ====================
       dibujarEncabezado(1)
-
       doc.setFontSize(9)
       doc.setFont("helvetica", "normal")
       
-      const fechaStr = new Date(p.fecha_inicio || Date.now()).toLocaleDateString()
-      doc.text(`VOCAL DE TURNO: ${firmas.find(f => f.firmante_tipo === 'vocal') ? 'Firmado Digital' : '____________________'}`, 15, 45)
-      doc.text(`CIUDAD: Pujilí`, 100, 45)
+      const fechaStr = new Date().toLocaleDateString()
+      doc.text(`VOCAL DE TURNO: ____________________`, 15, 45)
+      doc.text(`CIUDAD: Pujili`, 100, 45)
       doc.text(`FECHA: ${fechaStr}`, 145, 45)
       doc.text(`HORA: ${p.hora?.slice(0,5) || '________'}`, 15, 51)
 
-      // TABLA EQUIPO LOCAL
       doc.setFont("helvetica", "bold")
-      doc.text(`CLUB: ${p.local.nombre.toUpperCase()}`, 15, 60)
-      doc.text(`CATEGORÍA: ${p.local.categoria.toUpperCase()}`, 100, 60)
+      doc.text(`CLUB: ${cleanText(p.local?.nombre?.toUpperCase())}`, 15, 60)
+      doc.text(`CATEGORIA: ${cleanText(p.local?.categoria?.toUpperCase())}`, 100, 60)
 
-      const filasLocal = jugadoresLocal
-        .filter(j => planilla[j.id])
-        .map(j => {
-          const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
-          const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
-          const rojas = eventos.filter(e => e.tipo === 'roja' && e.jugador_id === j.id).length
-          return [
-            j.dorsal || '-',
-            `${j.apellidos} ${j.nombres}`,
-            goles > 0 ? goles.toString() : '',
-            amarillas > 0 ? 'X' : '',
-            rojas > 0 ? 'X' : ''
-          ]
-        })
+      const filasLocal = jugadoresLocal.filter(j => planilla[j.id]).map(j => {
+        const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
+        const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
+        const rojas = eventos.filter(e => e.tipo === 'roja' && e.jugador_id === j.id).length
+        return [j.dorsal || '-', cleanText(`${j.apellidos} ${j.nombres}`), goles > 0 ? goles.toString() : '', amarillas > 0 ? 'X' : '', rojas > 0 ? 'X' : '']
+      })
 
       autoTable(doc, {
         startY: 63,
@@ -178,35 +172,20 @@ export default function Actas() {
         theme: 'grid',
         headStyles: { fillColor: [200, 200, 200], textColor: [0,0,0], fontStyle: 'bold' },
         styles: { fontSize: 8, cellPadding: 1.5 },
-        columnStyles: {
-          0: { cellWidth: 15, halign: 'center' },
-          1: { cellWidth: 110 },
-          2: { cellWidth: 15, halign: 'center' },
-          3: { cellWidth: 15, halign: 'center' },
-          4: { cellWidth: 15, halign: 'center' }
-        }
+        columnStyles: { 0: { cellWidth: 15, halign: 'center' }, 1: { cellWidth: 110 }, 2: { cellWidth: 15, halign: 'center' }, 3: { cellWidth: 15, halign: 'center' }, 4: { cellWidth: 15, halign: 'center' } }
       })
 
-      // TABLA EQUIPO VISITANTE
       let finalY = doc.lastAutoTable.finalY + 10
       doc.setFont("helvetica", "bold")
-      doc.text(`CLUB: ${p.visitante.nombre.toUpperCase()}`, 15, finalY)
-      doc.text(`CATEGORÍA: ${p.visitante.categoria?.toUpperCase() || ''}`, 100, finalY)
+      doc.text(`CLUB: ${cleanText(p.visitante?.nombre?.toUpperCase())}`, 15, finalY)
+      doc.text(`CATEGORIA: ${cleanText(p.visitante?.categoria?.toUpperCase())}`, 100, finalY)
 
-      const filasVisitante = jugadoresVisitante
-        .filter(j => planilla[j.id])
-        .map(j => {
-          const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
-          const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
-          const rojas = eventos.filter(e => e.tipo === 'roja' && e.jugador_id === j.id).length
-          return [
-            j.dorsal || '-',
-            `${j.apellidos} ${j.nombres}`,
-            goles > 0 ? goles.toString() : '',
-            amarillas > 0 ? 'X' : '',
-            rojas > 0 ? 'X' : ''
-          ]
-        })
+      const filasVisitante = jugadoresVisitante.filter(j => planilla[j.id]).map(j => {
+        const goles = eventos.filter(e => e.tipo === 'gol' && e.jugador_id === j.id).length
+        const amarillas = eventos.filter(e => e.tipo === 'amarilla' && e.jugador_id === j.id).length
+        const rojas = eventos.filter(e => e.tipo === 'roja' && e.jugador_id === j.id).length
+        return [j.dorsal || '-', cleanText(`${j.apellidos} ${j.nombres}`), goles > 0 ? goles.toString() : '', amarillas > 0 ? 'X' : '', rojas > 0 ? 'X' : '']
+      })
 
       autoTable(doc, {
         startY: finalY + 3,
@@ -215,23 +194,15 @@ export default function Actas() {
         theme: 'grid',
         headStyles: { fillColor: [200, 200, 200], textColor: [0,0,0], fontStyle: 'bold' },
         styles: { fontSize: 8, cellPadding: 1.5 },
-        columnStyles: {
-          0: { cellWidth: 15, halign: 'center' },
-          1: { cellWidth: 110 },
-          2: { cellWidth: 15, halign: 'center' },
-          3: { cellWidth: 15, halign: 'center' },
-          4: { cellWidth: 15, halign: 'center' }
-        }
+        columnStyles: { 0: { cellWidth: 15, halign: 'center' }, 1: { cellWidth: 110 }, 2: { cellWidth: 15, halign: 'center' }, 3: { cellWidth: 15, halign: 'center' }, 4: { cellWidth: 15, halign: 'center' } }
       })
 
-      // ==================== PÁGINA 2: TARJETAS, NOVEDADES Y FIRMAS ====================
       doc.addPage()
       dibujarEncabezado(2)
-
       doc.setFontSize(9)
       doc.setFont("helvetica", "normal")
       
-      const nombreArbitro = p.arbitro ? `${p.arbitro.nombres} ${p.arbitro.apellidos}` : '________________________'
+      const nombreArbitro = p.arbitro ? `${cleanText(p.arbitro.nombres)} ${cleanText(p.arbitro.apellidos)}` : '________________________'
       doc.text(`NOMBRE DEL SR. ARBITRO: ${nombreArbitro}`, 15, 45)
 
       const tarjetasLocal = eventos.filter(ev => (ev.tipo === 'amarilla' || ev.tipo === 'roja') && ev.equipo_id === p.local.id)
@@ -239,8 +210,7 @@ export default function Actas() {
 
       const dibujarSeccionTarjetas = (startY, nombreClub, tarjetas) => {
         doc.setFont("helvetica", "bold")
-        doc.text(`TARJETAS DEL CLUB: ${nombreClub.toUpperCase()}`, 15, startY)
-        
+        doc.text(`TARJETAS DEL CLUB: ${cleanText(nombreClub.toUpperCase())}`, 15, startY)
         let yAmarillas = startY + 6
         let yRojas = startY + 45
 
@@ -251,8 +221,12 @@ export default function Actas() {
         for(let i=0; i<6; i++) {
           doc.text(`NO. ______`, 15, yAmarillas + (i*6))
           doc.line(35, yAmarillas + (i*6), 130, yAmarillas + (i*6))
-          if (amarillas[i]) doc.text(amarillas[i].jugador, 37, yAmarillas + (i*6) - 1)
-          doc.text(`POR: ________________`, 135, yAmarillas + (i*6))
+          if (amarillas[i]) {
+            doc.text(cleanText(amarillas[i].jugador), 37, yAmarillas + (i*6) - 1)
+            doc.text(`POR: ${cleanText(amarillas[i].motivo || '______')}`, 135, yAmarillas + (i*6))
+          } else {
+            doc.text(`POR: ________________`, 135, yAmarillas + (i*6))
+          }
         }
 
         doc.setFont("helvetica", "bold")
@@ -263,70 +237,79 @@ export default function Actas() {
         for(let i=0; i<4; i++) {
           doc.text(`NO. ______`, 15, yRojas + (i*6))
           doc.line(35, yRojas + (i*6), 130, yRojas + (i*6))
-          if (rojas[i]) doc.text(rojas[i].jugador, 37, yRojas + (i*6) - 1)
-          doc.text(`POR: ________________`, 135, yRojas + (i*6))
+          if (rojas[i]) {
+            doc.text(cleanText(rojas[i].jugador), 37, yRojas + (i*6) - 1)
+            doc.text(`POR: ${cleanText(rojas[i].motivo || '______')}`, 135, yRojas + (i*6))
+          } else {
+            doc.text(`POR: ________________`, 135, yRojas + (i*6))
+          }
         }
         return yRojas + 30
       }
 
-      let nextY = dibujarSeccionTarjetas(55, p.local.nombre, tarjetasLocal)
-      nextY = dibujarSeccionTarjetas(nextY, p.visitante.nombre, tarjetasVisitante)
+      let nextY = dibujarSeccionTarjetas(55, p.local?.nombre, tarjetasLocal)
+      nextY = dibujarSeccionTarjetas(nextY, p.visitante?.nombre, tarjetasVisitante)
 
+      // SECCIÓN NOVEDADES
       doc.setFont("helvetica", "bold")
       doc.text('NOVEDADES:', 15, nextY)
       doc.setFont("helvetica", "normal")
-      const splitText = doc.splitTextToSize(novedades || 'Sin novedades registradas.', 175)
+      const splitText = doc.splitTextToSize(cleanText(p.acta?.[0]?.observaciones || 'Sin novedades registradas.'), 175)
       doc.text(splitText, 15, nextY + 6)
       
-      let lineY = nextY + 6 + (splitText.length * 5) + 5
-      for(let i=0; i<4; i++) {
-        doc.line(15, lineY + (i*8), 195, lineY + (i*8))
-      }
+      let lineY = nextY + 6 + (splitText.length * 5) + 10
 
-      // ==================== FIRMAS (NUEVO) ====================
-      const firmaY = Math.min(lineY + 50, 220)
+      // FIRMAS EN UNA SOLA LÍNEA
+      const firmaY = Math.min(lineY + 50, 240)
       
       const fArbitro = firmas.find(f => f.firmante_tipo === 'arbitro')
-      const fCapLocal = firmas.find(f => f.firmante_tipo === 'local')
-      const fCapVisitante = firmas.find(f => f.firmante_tipo === 'visitante')
+      const fCapLocal = firmas.find(f => f.firmante_tipo === 'capitan_local' || f.firmante_tipo === 'local')
+      const fCapVisitante = firmas.find(f => f.firmante_tipo === 'capitan_visitante' || f.firmante_tipo === 'visitante')
       const fVocal = firmas.find(f => f.firmante_tipo === 'vocal')
 
-      // Firmas Capitanes
-      if (fCapLocal?.firma_digital) doc.addImage(fCapLocal.firma_digital, 'PNG', 20, firmaY - 20, 40, 20)
-      if (fCapVisitante?.firma_digital) doc.addImage(fCapVisitante.firma_digital, 'PNG', 130, firmaY - 20, 40, 20)
+      const drawImageSafely = (base64, x, y, w, h) => {
+        try {
+          if (!base64) return;
+          const cleanB64 = base64.includes(',') ? base64.split(',')[1] : base64;
+          doc.addImage(cleanB64, "png", x, y, w, h, undefined, 'FAST');
+        } catch (e) {
+          console.error("Error al dibujar firma en PDF", e);
+        }
+      };
 
-      doc.line(15, firmaY, 65, firmaY)
-      doc.line(135, firmaY, 185, firmaY)
-      doc.setFontSize(8)
-      doc.setFont("helvetica", "bold")
-      doc.text(`CAPITÁN ${p.local.nombre}`, 40, firmaY + 4, { align: 'center' })
-      doc.text(`CAPITÁN ${p.visitante.nombre}`, 160, firmaY + 4, { align: 'center' })
+      const xPositions = [15, 65, 115, 165];
+      const firmantes = [
+        { nombre: 'CAPITÁN LOCAL', firma: fCapLocal },
+        { nombre: 'CAPITÁN VISITANTE', firma: fCapVisitante },
+        { nombre: 'ÁRBITRO', firma: fArbitro },
+        { nombre: 'VOCAL', firma: fVocal }
+      ];
 
-      // Firmas Arbitro y Vocal
-      const firmaY2 = firmaY + 30
-      if (fArbitro?.firma_digital) doc.addImage(fArbitro.firma_digital, 'PNG', 50, firmaY2 - 20, 40, 20)
-      if (fVocal?.firma_digital) doc.addImage(fVocal.firma_digital, 'PNG', 120, firmaY2 - 20, 40, 20)
-
-      doc.line(40, firmaY2, 100, firmaY2)
-      doc.line(110, firmaY2, 170, firmaY2)
-      doc.text('FIRMA DEL SR. ÁRBITRO', 70, firmaY2 + 4, { align: 'center' })
-      doc.text('FIRMA DEL VOCAL', 140, firmaY2 + 4, { align: 'center' })
+      firmantes.forEach((item, index) => {
+        const x = xPositions[index];
+        drawImageSafely(item.firma?.firma_digital, x, firmaY - 20, 30, 15)
+        doc.line(x, firmaY, x + 30, firmaY)
+        doc.setFontSize(7)
+        doc.setFont("helvetica", "bold")
+        doc.text(item.nombre, x + 15, firmaY + 4, { align: 'center' })
+      })
 
       doc.setFontSize(8)
       doc.text('VIVE EL FUTBOL SIN DROGAS Y SIN ALCOHOL', 15, 285)
       doc.text('CAMPEONATO 2026', 170, 285)
 
-      doc.save(`Acta_Oficial_${p.local?.nombre}_vs_${p.visitante?.nombre}.pdf`)
-      toast.success('PDF Oficial descargado con firmas')
+      const nombreLocal = p.local?.nombre?.replace(/[^a-zA-Z0-9]/g, '') || 'Local';
+      const nombreVisitante = p.visitante?.nombre?.replace(/[^a-zA-Z0-9]/g, '') || 'Visitante';
+      
+      doc.save(`Acta_${nombreLocal}_vs_${nombreVisitante}.pdf`)
+      toast.success('PDF Oficial descargado')
     } catch (err) {
-      console.error(err)
+      console.error("Error general en PDF:", err)
       toast.error('Error al generar PDF')
     }
   }
 
-  // ... (El resto del código de las vistas: toggleJugador, guardarPlanilla, registrarAccion, finalizarPartido, firmarActa, y los return de las vistas se mantienen igual que en tu archivo original) ...
-
-  function toggleJugador(jugadorId, esLocal) {
+  async function toggleJugador(jugadorId, esLocal) {
     const jugadoresEquipo = esLocal ? jugadoresLocal : jugadoresVisitante
     const jugador = jugadoresEquipo.find(j => j.id === jugadorId)
     if (jugador.estado_carnet === 'BLOQUEADO') return toast.error(`No habilitado: ${jugador.motivos_bloqueo.join(' | ')}`)
@@ -349,7 +332,10 @@ export default function Actas() {
     if (!partidoSeleccionado) return
     const titularesLocal = Object.entries(planilla).filter(([id, rol]) => rol === 'titular' && jugadoresLocal.some(j => j.id === id)).length
     const titularesVisitante = Object.entries(planilla).filter(([id, rol]) => rol === 'titular' && jugadoresVisitante.some(j => j.id === id)).length
-    if ((titularesLocal < reglas.min_jugadores || titularesVisitante < reglas.min_jugadores) && iniciarPartido) return toast.error('No puedes iniciar el partido sin el mínimo de jugadores')
+    
+    if ((titularesLocal < reglas.min_jugadores || titularesVisitante < reglas.min_jugadores) && iniciarPartido) {
+      return toast.error(`No puedes iniciar el partido sin el mínimo de jugadores (${reglas.min_jugadores} por equipo). Si un equipo no se presentó, usa la opción de incomparecencia.`)
+    }
 
     setGuardando(true)
     try {
@@ -389,7 +375,7 @@ export default function Actas() {
       const { data: t } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partidoSeleccionado.id)
       let evs = []
       if (g) g.forEach(x => evs.push({ tipo: 'gol', jugador_id: x.jugador.id, jugador: `${x.jugador.apellidos} ${x.jugador.nombres}`, equipo_id: null }))
-      if (t) t.forEach(x => evs.push({ tipo: x.tipo, jugador_id: x.jugador.id, jugador: `${x.jugador.apellidos} ${x.jugador.nombres}`, equipo_id: x.equipo.id }))
+      if (t) t.forEach(x => evs.push({ tipo: x.tipo, jugador_id: x.jugador.id, jugador: `${x.jugador.apellidos} ${x.jugador.nombres}`, equipo_id: x.equipo.id, motivo: x.motivo }))
       setEventos(evs)
     } catch (err) {
       console.error(err)
@@ -580,7 +566,7 @@ export default function Actas() {
         {(titularesL < reglas.min_jugadores || titularesV < reglas.min_jugadores) && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded flex items-start gap-2">
             <AlertTriangle className="text-red-500" size={20} />
-            <p className="text-sm text-red-700 font-semibold">Faltan titulares. No podrás iniciar el partido hasta cumplir el mínimo.</p>
+            <p className="text-sm text-red-700 font-semibold">Faltan titulares. No podrás iniciar el partido hasta cumplir el mínimo de {reglas.min_jugadores} jugadores por equipo.</p>
           </div>
         )}
 
@@ -680,6 +666,7 @@ export default function Actas() {
                 <span className="font-bold">{ev.jugador}</span>
                 <span className="text-gray-400">-</span>
                 <span className="capitalize">{ev.tipo === 'amarilla' ? '🟨 Tarjeta Amarilla' : ev.tipo === 'roja' ? '🟥 Tarjeta Roja' : '⚽ Gol'}</span>
+                {ev.motivo && <span className="text-gray-500 text-xs ml-auto">({ev.motivo})</span>}
               </div>
             ))}
           </div>
