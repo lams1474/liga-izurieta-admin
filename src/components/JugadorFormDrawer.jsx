@@ -347,7 +347,8 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
               <div className="col-span-1">
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Cédula *</label>
                 <div className="flex gap-2">
-                  <input type="text" value={form.cedula} onChange={(e) => { actualizarCampo('cedula', e.target.value.replace(/\D/g, '').slice(0, 10)); if (jugadorExistente) setJugadorExistente(null); }} disabled={!!jugadorExistente || !!jugadorEditar} className={`w-full px-3 py-2 border rounded-md font-mono ${errores.cedula ? 'border-red-500' : 'border-gray-300'} ${jugadorExistente || jugadorEditar ? 'bg-gray-100 text-gray-500' : ''}`} maxLength={10} />
+                  {/* AQUI SE QUITO EL BLOQUEO PARA PERMITIR EDITAR LA CEDULA */}
+                  <input type="text" value={form.cedula} onChange={(e) => { actualizarCampo('cedula', e.target.value.replace(/\D/g, '').slice(0, 10)); if (jugadorExistente) setJugadorExistente(null); }} disabled={!!jugadorExistente} className={`w-full px-3 py-2 border rounded-md font-mono ${errores.cedula ? 'border-red-500' : 'border-gray-300'} ${jugadorExistente ? 'bg-gray-100 text-gray-500' : ''}`} maxLength={10} />
                   {!jugadorEditar && !jugadorExistente && (
                     <button type="button" onClick={verificarCedula} disabled={buscandoCedula || form.cedula.length !== 10} className="bg-gray-200 text-gray-700 px-3 rounded-md hover:bg-gray-300 disabled:opacity-50 flex-shrink-0 flex items-center gap-1 font-semibold text-sm">
                       {buscandoCedula ? <Loader size={16} className="animate-spin" /> : <Search size={16} />} Buscar

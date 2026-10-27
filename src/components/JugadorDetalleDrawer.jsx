@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   X, User, Edit, DollarSign, UserMinus, AlertTriangle,
   FileText, Shield, Award, Clock,
-  CheckCircle, XCircle, QrCode, Printer, CheckSquare, XSquare, Power
+  CheckCircle, XCircle, QrCode, Printer, CheckSquare, XSquare, Power, Trash2
 } from 'lucide-react'
 import CarnetDigitalCard from './CarnetDigitalCard'
 import { supabase } from '../lib/supabase'
@@ -22,7 +22,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
   const [deudas, setDeudas] = useState([])
   
   const [modalPago, setModalPago] = useState(false)
-  const [modalBaja, setModalBaja] = useState(null) // Guarda la inscripción a dar de baja
+  const [modalBaja, setModalBaja] = useState(null)
   const [modalCarnet, setModalCarnet] = useState(false)
   const [montoPago, setMontoPago] = useState('1.00')
   const [guardando, setGuardando] = useState(false)
@@ -169,11 +169,42 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
     }
   }
 
+  async function eliminarJugador() {
+    if (!window.confirm("⚠️ ¿Estás seguro de ELIMINAR a este jugador permanentemente? Esta acción no se puede deshacer y solo funciona si el jugador no ha jugado ningún partido.")) return;
+    
+    setGuardando(true);
+    try {
+      // Verificamos si tiene eventos o sanciones para no borrar historial
+      const { count: eventosCount } = await supabase.from('goles').select('*', { count: 'exact', head: true }).eq('jugador_id', jugadorId);
+      const { count: sancionesCount } = await supabase.from('sanciones_jugador').select('*', { count: 'exact', head: true }).eq('jugador_id', jugadorId);
+      
+      if (eventosCount > 0 || sancionesCount > 0) {
+        throw new Error('No se puede eliminar: el jugador ya tiene historial (goles o tarjetas). Usa el botón "Inactivar Jugador" en su lugar.');
+      }
+
+      // Si no tiene historial, borramos sus inscripciones y luego al jugador
+      await supabase.from('jugador_equipo').delete().eq('jugador_id', jugadorId);
+      await supabase.from('historial_clubes_jugador').delete().eq('jugador_id', jugadorId);
+      
+      const { error } = await supabase.from('jugadores').delete().eq('id', jugadorId);
+      if (error) throw error;
+
+      toast.success('Jugador eliminado correctamente');
+      onCerrar();
+      onCambio();
+      
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   async function confirmarBaja() {
     if (!modalBaja) return;
     setGuardando(true)
     try {
-      // Solo inactiva la inscripción de este equipo
       await supabase.from('jugador_equipo').update({ activo: false }).eq('id', modalBaja.id)
       const hoy = new Date().toISOString().split('T')[0]
       await supabase.from('historial_clubes_jugador').update({ fecha_hasta: hoy }).eq('jugador_id', jugadorId).eq('equipo_id', modalBaja.equipo.id).is('fecha_hasta', null)
@@ -417,6 +448,16 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
                 {esAdmin && (
                    <button onClick={() => cambiarEstadoActivo(!jugador.activo)} disabled={guardando} className={`px-4 py-2 rounded-md text-sm font-semibold flex items-center gap-2 ${jugador.activo ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
                     <Power size={16} /> {jugador.activo ? 'Inactivar Jugador Globalmente' : 'Activar Jugador Globalmente'}
+                  </button>
+                )}
+                {/* NUEVO BOTÓN DE ELIMINAR */}
+                {esAdmin && (
+                  <button 
+                    onClick={eliminarJugador} 
+                    disabled={guardando} 
+                    className="px-4 py-2 rounded-md text-sm font-semibold flex items-center gap-2 bg-gray-800 text-white hover:bg-black transition-colors"
+                  >
+                    <Trash2 size={16} /> Eliminar Jugador
                   </button>
                 )}
               </div>
