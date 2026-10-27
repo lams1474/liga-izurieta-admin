@@ -86,12 +86,16 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
-      const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
-      const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
+      const { data: goles, error: errGoles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
+      const { data: tarjetas, error: errTarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
       
+      if (errGoles) console.error("Error cargando goles:", errGoles)
+      if (errTarjetas) console.error("Error cargando tarjetas:", errTarjetas)
+
       let evs = []
       if (goles) goles.forEach(g => evs.push({ tipo: 'gol', jugador_id: g.jugador.id, jugador: `${g.jugador.apellidos} ${g.jugador.nombres}`, equipo_id: null }))
-      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador_id: t.jugador.id, jugador: `${t.jugador.apellidos} ${t.jugador.nombres}`, equipo_id: t.equipo.id, motivo: t.motivo }))
+      if (tarjetas) tarjetas.forEach(t => evs.push({ tipo: t.tipo, jugador_id: t.jugador.id, jugador: `${t.jugador.apellidos} ${t.jugador.nombres}`, equipo_id: t.equipo?.id, motivo: t.motivo }))
+      
       setEventos(evs)
       setMarcador({ local: partido.goles_local || 0, visitante: partido.goles_visitante || 0 })
 
@@ -114,7 +118,7 @@ export default function Actas() {
     }
   }
 
-  // ============ GENERAR PDF OFICIAL (A PRUEBA DE BALAS) ============
+  // ============ GENERAR PDF OFICIAL ============
   function descargarPDF() {
     try {
       const doc = new jsPDF()
@@ -426,7 +430,6 @@ export default function Actas() {
 
   if (cargando && vista === 'lista') return <div className="p-8 text-center">Cargando...</div>
 
-  // ... (El resto de las vistas de JSX se mantienen igual) ...
   if (vista === 'lista') {
     return (
       <div className="max-w-4xl mx-auto">
