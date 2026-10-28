@@ -62,7 +62,6 @@ export default function Actas() {
     setCargando(true)
 
     try {
-      // Obtener la fecha real del partido
       const { data: fechaData } = await supabase.from('fechas').select('fecha_inicio').eq('id', partido.fecha_id).single()
       if (fechaData) {
         setPartidoSeleccionado(prev => ({ ...prev, fecha_inicio: fechaData.fecha_inicio }))
@@ -92,7 +91,6 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
-      // Cargar eventos (Goles y Tarjetas)
       const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
       const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
       
