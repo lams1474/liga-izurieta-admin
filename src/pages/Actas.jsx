@@ -94,9 +94,16 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
+      // === CARGA DE EVENTOS SIN DUPLICADOS ===
       const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
-      const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
       
+      // Usamos un Map para evitar duplicados por ID de sanción
+      const tarjetasRaw = await supabase.from('sanciones_jugador')
+        .select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)')
+        .eq('partido_id', partido.id)
+
+      const tarjetasUnicas = Array.from(new Map((tarjetasRaw.data || []).map(t => [t.id, t])).values())
+
       let evs = []
       if (goles) goles.forEach(g => evs.push({ 
         tipo: 'gol', 
@@ -105,7 +112,7 @@ export default function Actas() {
         equipo_id: null 
       }))
       
-      if (tarjetas) tarjetas.forEach(t => {
+      if (tarjetasUnicas) tarjetasUnicas.forEach(t => {
         const dorsalEncontrado = localJugadores.find(j => j.id === t.jugador.id)?.dorsal 
                               || visitanteJugadores.find(j => j.id === t.jugador.id)?.dorsal 
                               || '?';
@@ -147,10 +154,16 @@ export default function Actas() {
       const doc = new jsPDF()
       const p = partidoSeleccionado
       
-      // Limpieza extrema: Solo deja letras, números y espacios simples
+      // LIMPIEZA ULTRA AGRESIVA: Solo letras A-Z, números y espacios simples
       const clean = (str) => {
         if (!str) return '';
-        return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+        return String(str)
+          .replace(/ñ/g, 'n')
+          .replace(/Ñ/g, 'N')
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quita tildes
+          .replace(/[^a-zA-Z0-9 ]/g, '') // Quita todo lo que no sea letra/número/espacio
+          .replace(/\s+/g, ' ') // Colapsa espacios dobles
+          .trim();
       }
 
       const dibujarEncabezado = (pagina) => {
@@ -323,7 +336,17 @@ export default function Actas() {
       const nombreLocal = clean(p.local?.nombre) || 'Local';
       const nombreVisitante = clean(p.visitante?.nombre) || 'Visitante';
       
-      doc.save(`Acta_${nombreLocal}_vs_${nombreVisitante}.pdf`)
+      // Forzar descarga de PDF
+      const pdfBlob = doc.output('blob');
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Acta_${nombreLocal}_vs_${nombreVisitante}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
       toast.success('PDF Oficial descargado')
     } catch (err) {
       console.error("Error general en PDF:", err)
