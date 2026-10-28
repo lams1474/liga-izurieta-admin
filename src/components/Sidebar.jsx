@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Users, Building2, DollarSign, Calendar, AlertTriangle,
-  FileText, BarChart3, Settings, UserCog, ClipboardList, PlayCircle,
-  QrCode, MessageSquare, Target, PenTool, ShieldCheck, BookUser,
-  Menu, X,
+  FileText, BarChart3, UserCog, QrCode, Menu, X,
+  ShieldCheck, BookUser, Settings, Edit3 as PenTool
 } from 'lucide-react'
 
 const menusPorRol = {
@@ -31,6 +30,7 @@ const menusPorRol = {
     { path: '/sanciones', label: 'Sanciones', icon: AlertTriangle },
     { path: '/actas', label: 'Actas', icon: FileText },
     { path: '/reportes', label: 'Reportes', icon: BarChart3 },
+    { path: '/configuracion', label: 'Configuración', icon: Settings },
   ],
   delegado: [
     { path: '/', label: 'Inicio', icon: Home },
@@ -53,17 +53,11 @@ const menusPorRol = {
   ],
   vocal: [
     { path: '/', label: 'Inicio', icon: Home },
-    { path: '/planilla', label: 'Planilla de Juego', icon: ClipboardList },
-    { path: '/partido', label: 'Partido en Curso', icon: PlayCircle },
-    { path: '/validar-carnets', label: 'Validar Carnets', icon: QrCode },
-    { path: '/novedades', label: 'Novedades', icon: MessageSquare },
+    { path: '/actas', label: 'Actas', icon: FileText },
   ],
   arbitro: [
     { path: '/', label: 'Inicio', icon: Home },
-    { path: '/partido', label: 'Partido en Curso', icon: PlayCircle },
-    { path: '/tarjetas', label: 'Registrar Tarjetas', icon: AlertTriangle },
-    { path: '/goles', label: 'Registrar Goles', icon: Target },
-    { path: '/novedades', label: 'Novedades', icon: MessageSquare },
+    { path: '/calendario', label: 'Calendario', icon: Calendar },
   ],
 }
 
@@ -89,7 +83,7 @@ export default function Sidebar({ usuario }) {
 
   return (
     <>
-      {/* ================= BOTÓN HAMBURGUESA (solo móvil) ================= */}
+      {/* Botón hamburguesa para móvil */}
       <button
         onClick={() => setMenuMovilAbierto(true)}
         className="md:hidden fixed bottom-4 right-4 z-50 bg-liga-azul text-white p-3 rounded-full shadow-2xl hover:bg-liga-azul/90 transition-all"
@@ -98,7 +92,7 @@ export default function Sidebar({ usuario }) {
         <Menu size={24} />
       </button>
 
-      {/* ================= SIDEBAR DESKTOP ================= */}
+      {/* Sidebar Desktop */}
       <aside className="bg-white shadow-md w-64 min-h-[calc(100vh-64px)] hidden md:block">
         <nav className="py-4">
           {menu.map((item) => {
@@ -123,7 +117,7 @@ export default function Sidebar({ usuario }) {
         </nav>
       </aside>
 
-      {/* ================= OVERLAY MÓVIL ================= */}
+      {/* Overlay oscuro para móvil */}
       {menuMovilAbierto && (
         <div
           onClick={() => setMenuMovilAbierto(false)}
@@ -131,13 +125,12 @@ export default function Sidebar({ usuario }) {
         />
       )}
 
-      {/* ================= SIDEBAR MÓVIL (drawer) ================= */}
+      {/* Sidebar Móvil */}
       <aside
         className={`md:hidden fixed top-0 left-0 h-full w-64 bg-white shadow-2xl z-50 transform transition-transform duration-300 ${
           menuMovilAbierto ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Header del menú */}
         <div className="bg-liga-azul text-white px-4 py-4 flex items-center justify-between">
           <div>
             <h2 className="font-bold">Menú</h2>
@@ -152,7 +145,6 @@ export default function Sidebar({ usuario }) {
           </button>
         </div>
 
-        {/* Items del menú */}
         <nav className="py-2 overflow-y-auto h-[calc(100%-70px)]">
           {menu.map((item) => {
             const Icon = item.icon

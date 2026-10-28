@@ -12,9 +12,25 @@ import Actas from './pages/Actas'
 import Reportes from './pages/Reportes'
 import MiCarnet from './pages/MiCarnet'
 import MisJugadores from './pages/MisJugadores'
+import RegistroJugador from './pages/RegistroJugador'
+import MiClub from './pages/MiClub'
+import MiNomina from './pages/MiNomina'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
+
+// Componente que decide qué mostrar en "/" según el rol
+function HomeRedirect() {
+  const { usuario } = useAuth()
+
+  // Los jugadores van directo a su carnet
+  if (usuario?.rol === 'jugador') {
+    return <Navigate to="/mi-carnet" replace />
+  }
+
+  // Los demás ven el Dashboard
+  return <Dashboard />
+}
 
 function App() {
   const { estaAutenticado, cargando } = useAuth()
@@ -38,11 +54,82 @@ function App() {
       />
 
       <Route
+        path="/registro"
+        element={estaAutenticado ? <Navigate to="/" replace /> : <RegistroJugador />}
+      />
+
+      <Route
         path="/"
         element={
           <ProtectedRoute>
             <Layout>
-              <Dashboard />
+              <HomeRedirect />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/reportes"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <Reportes />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/actas"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria', 'vocal', 'arbitro', 'capitan']}>
+            <Layout>
+              <Actas />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/sanciones"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria', 'delegado']}>
+            <Layout>
+              <Sanciones />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/calendario"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria', 'delegado', 'vocal', 'arbitro']}>
+            <Layout>
+              <Calendario />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pagos"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <Pagos />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/equipos"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <Equipos />
             </Layout>
           </ProtectedRoute>
         }
@@ -178,6 +265,28 @@ function App() {
           <ProtectedRoute rolesPermitidos={['delegado']}>
             <Layout>
               <MisJugadores />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mi-club"
+        element={
+          <ProtectedRoute rolesPermitidos={['delegado']}>
+            <Layout>
+              <MiClub />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/mi-nomina"
+        element={
+          <ProtectedRoute rolesPermitidos={['delegado']}>
+            <Layout>
+              <MiNomina />
             </Layout>
           </ProtectedRoute>
         }
