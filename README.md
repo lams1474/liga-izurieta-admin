@@ -1,8 +1,9 @@
-# Sistema Liga Izurieta - Panel Administrativo
+# Sistema Liga Izurieta
 
 Sistema administrativo web para la **Liga Deportiva Barrial José Ignacio Izurieta**.
 
-Panel central para gestionar jugadores, equipos, usuarios, pagos, sanciones, calendario y actas de la liga, con roles de acceso diferenciados (Admin, Secretaría, Presidente, Árbitro, etc.).
+Panel para gestionar jugadores, equipos, pagos, sanciones, calendario y actas
+de la liga, con roles diferenciados por tipo de usuario.
 
 ---
 
@@ -10,138 +11,168 @@ Panel central para gestionar jugadores, equipos, usuarios, pagos, sanciones, cal
 
 - [Descripción](#-descripción)
 - [Estado del proyecto](#-estado-del-proyecto)
-- [Módulos y Funcionalidades](#-módulos-y-funcionalidades)
+- [Módulos](#-módulos)
 - [Roles y permisos](#-roles-y-permisos)
 - [Tecnologías](#-tecnologías)
 - [Estructura del proyecto](#-estructura-del-proyecto)
 - [Instalación](#-instalación)
 - [Configuración](#-configuración)
 - [Scripts disponibles](#-scripts-disponibles)
-- [Seguridad](#-seguridad)
+- [Convenciones](#-convenciones)
 
 ---
 
 ## 📖 Descripción
 
-Este proyecto es el **panel administrativo y de gestión** de la liga. Se conecta a la misma base de datos que la web pública, pero requiere autenticación (Supabase Auth) y ofrece funcionalidades específicas según el rol del usuario.
+Este proyecto es el **panel administrativo** de la liga. Se conecta a la misma
+base de datos que la web pública, pero requiere autenticación y ofrece
+funcionalidades según el rol del usuario.
 
 **Proyectos relacionados:**
 
 | Proyecto | URL | Descripción |
 |---|---|---|
 | Web Pública | [web-liga-izurieta.vercel.app](https://web-liga-izurieta.vercel.app) | Sitio público sin login |
-| Panel Admin | [liga-izurieta-admin.vercel.app](https://liga-izurieta-admin.vercel.app) | Este proyecto (Producción) |
-| App Móvil (Futuro) | (pendiente) | Aplicación offline-first para Vocal/Árbitro |
+| Panel Admin | [liga-izurieta-admin.vercel.app](https://liga-izurieta-admin.vercel.app) | Este proyecto |
+| App Móvil Vocal/Árbitro | (pendiente) | Aplicación offline-first |
 
 ---
 
 ## 🚦 Estado del proyecto
 
-**Fase actual: ✅ Completado y en Producción**
+**Fase actual: En desarrollo**
 
 | Fase | Módulo | Estado |
 |---|---|---|
-| 1 | Login y autenticación con Roles | ✅ Completado |
-| 2 | Header + Sidebar dinámico por rol | ✅ Completado |
-| 3 | Módulo Jugadores (CRUD + Fotos + LOPDP) | ✅ Completado |
+| 1 | Login y autenticación | ✅ Completado |
+| 2 | Header + Sidebar con roles | ✅ Completado |
+| 3 | Módulo Jugadores (CRUD) | ✅ Completado |
 | 4 | Importar Excel masivo | ✅ Completado |
-| 5 | Módulo Usuarios (Edge Function + Períodos) | ✅ Completado |
-| 6 | Módulo Equipos (Escudos y Plantillas) | ✅ Completado |
-| 7 | Módulo Pagos (Carnets y Cuotas de Equipos) | ✅ Completado |
-| 8 | Módulo Calendario (Etapas, Fechas, Partidos) | ✅ Completado |
-| 9 | Módulo Sanciones y Deudas | ✅ Completado |
-| 10 | Módulo Actas (Planilla, Goles, Tarjetas, PDF Oficial) | ✅ Completado |
-| 11 | Módulo Reportes Financieros y Estadísticos | ✅ Completado |
-| 12 | Módulo Configuración (Multas y Carnets) | ✅ Completado |
-| 13 | Panel del Presidente (Jugadores, Club, Nómina) | ✅ Completado |
-| 14 | Deploy en Vercel | ✅ Completado |
+| 5 | Módulo Usuarios | ✅ Completado |
+| 6 | Módulo Equipos (CRUD) | ✅ Completado |
+| 7 | Módulo Pagos | ✅ Completado |
+| 8 | Módulo Calendario | ✅ Completado |
+| 9 | Módulo Sanciones | ✅ Completado |
+| 10 | Módulo Actas | ✅ Completado |
+| 11 | Módulo Reportes | ✅ Completado |
+| 12 | Módulo Presidente (Mis Jugadores) | ✅ Completado |
+| 13 | Deploy en Vercel | ✅ Desplegado |
 
 ---
 
-## 🎯 Módulos y Funcionalidades
+## 🎯 Módulos
 
-### 1. Gestión de Jugadores
-- Lista con búsqueda y filtros (disciplina, categoría, club, estado).
-- Crear/Editar jugadores con validación de cédula y LOPDP (tutores para menores).
-- Subida de foto (cámara o archivo) con compresión automática.
-- Importador masivo desde Excel.
-- Generación automática de código interno (`JUG-XXXXX`).
-- Gestión de pases (cambio de club con historial automático).
+### Módulo Jugadores y Carnet Digital ✅
 
-### 2. Gestión de Equipos
-- Vista general de los 12 clubes en sus diferentes categorías (Fútbol, Futsala, Ecuavoly).
-- Subida y corrección de escudos.
-- Visualización de plantillas completas.
-- Activar/Desactivar equipos.
+**Funcionalidades:**
+- Lista de jugadores con búsqueda y filtros por disciplina, categoría, equipo y estado.
+- Registro y edición completa de datos personales y deportivos.
+- Firma y gestión de Consentimiento de Datos Personales (LOPDP).
+- Generación de Carnet Digital Oficial con formato estándar CR80, foto de perfil, estado de habilitación, código de barras y firma digital.
+- Validación automática de estado del carnet (pago registrado, consentimiento firmado, sin deudas o sanciones activas y pase aprobado).
+- Cambio de club e historial deportivo automático.
+- Dar de baja del club con mantenimiento de historial.
 
-### 3. Gestión de Usuarios
-- Creación de cuentas para presidentes, árbitros, capitanes y vocales mediante **Supabase Edge Functions** (creación segura usando `service_role`).
-- Asignación de clubes a presidentes.
-- Activación de **Períodos de Inscripción** (por defecto 8 días) con cuenta regresiva para los presidentes.
+### Módulo Equipos y Clubes ✅
 
-### 4. Calendario y Partidos
-- Creación de Etapas y Fechas (jornadas).
-- Programación de partidos (Local vs Visitante, cancha, hora, árbitro).
-- Edición y eliminación de partidos programados.
+- Gestión de clubes con disciplinas (Fútbol, Futsala) y categorías (Máster, Abierta, Femenino).
+- Asignación de presidente y delegado del equipo.
+- Control de estado activo del club y nómina de jugadores.
 
-### 5. Actas y Planillas
-- Armado de planilla (Titulares/Suplentes).
-- **Validación estricta:** Bloqueo automático de jugadores con carnet no pagado, sanciones o deudas.
-- Validación de mínimos reglamentarios (Fútbol: 7 titulares, Futsala: 4 titulares).
-- Registro en vivo de goles y tarjetas.
-- Generación de **PDF Oficial de 2 páginas** idéntico al acta física de la liga.
-- Flujo de firmas (Árbitro, Vocal, Capitanes) para el cierre del acta.
+### Módulo Pagos y Tesorería ✅
 
-### 6. Pagos y Finanzas
-- Cobro del Carnet Digital anual ($1).
-- Cobro de multas generadas por tarjetas.
-- Pestaña de "Deudas de Equipos" para registrar inscripciones o mensualidades.
+- Registro de pagos de carnet digital con habilitación automática del jugador.
+- Cobros a clubes y jugadores: Inscripciones, Cuotas Mensuales, Cuotas Anuales de Afiliación, y Multas Reglamentarias.
+- Gestión de deudas y saldos pendientes con abonos parciales.
 
-### 7. Reportes y Estadísticas
-- Dashboard financiero (Ingresos, deudas pendientes).
-- Estadísticas del torneo (Partidos jugados, goles, equipos, jugadores).
-- Barra de progreso de calificación de jugadores.
+### Módulo Calendario de Partidos ✅
 
-### 8. Panel del Presidente (Delegado)
-- Vista "Mis Jugadores" (edición limitada al período de inscripción).
-- Vista "Mi Club" (ver y subir escudo).
-- Vista "Mi Nómina" (descarga en Excel y PDF).
+- Programación y visualización de partidos por fecha, hora, cancha y categoría.
+- Control de partidos jugados, programados y suspendidos.
+
+### Módulo Sanciones y Disciplina ✅
+
+- Registro de tarjetas amarillas, rojas y suspensiones administrativas.
+- Búsqueda automática de la inscripción activa del jugador para evitar inconsistencias.
+- Generación automática de multas reglamentarias e integración con deudas.
+
+### Módulo Actas y Reportes ✅
+
+- Generación de actas oficiales de partidos con control de vocalía y arbitraje.
+- Exportación e impresión de reportes institucionales y estadísticas.
+
+**Funcionalidades:**
+- Lista de jugadores con búsqueda y filtros (por disciplina, categoría, equipo, estado)
+- Agregar jugador con formulario completo
+- Editar datos del jugador
+- Cambiar de equipo (registra historial automáticamente)
+- Detalle completo del jugador (con sanciones, deudas e historial)
+- Dar de baja del club (baja lógica, mantiene historial)
+- Registrar pago del carnet digital
+- Importar jugadores masivamente desde Excel
+
+**Filtros de estado:**
+- Solo activos en un club (por defecto)
+- Sin equipo (dados de baja)
+- Todos los jugadores
+
+**Validaciones:**
+- Cédula debe tener 10 dígitos
+- Menores de 18 requieren datos del tutor (LOPDP)
+- Tipo de pase requerido si no es "nuevo"
+- Club anterior obligatorio si el pase no es "nuevo"
+
+### Importador Excel ✅
+
+**Formato del archivo:**
+- 12 hojas, una por combinación de disciplina + categoría
+- Columnas: Apellidos y Nombres, Cédula, Fecha de Nacimiento, Dorsal, Posición, Tipo de Pase, Club Anterior, datos del Tutor, Observaciones
+
+**Proceso:**
+1. Seleccionar equipo (dropdown)
+2. Subir archivo `.xlsx`
+3. Analizar y mostrar resumen (válidos, advertencias, errores)
+4. Importar solo las filas válidas
+5. Detección automática de duplicados
 
 ---
 
 ## 👥 Roles y permisos
 
-| Rol en BD | Nombre visible | Módulos disponibles |
+| Rol | Descripción | Módulos disponibles |
 |---|---|---|
-| `admin` | Administrador | Todos los módulos |
-| `secretaria` | Secretaría | Jugadores, Equipos, Pagos, Calendario, Sanciones, Actas, Reportes, Configuración |
-| `delegado` | Presidente de Club | Mis Jugadores, Mi Club, Mi Nómina, Ver Sanciones |
-| `capitan` | Capitán | Actas (Firma de partidos) |
-| `vocal` | Vocal | Actas, Calendario |
-| `arbitro` | Árbitro | Actas, Calendario |
+| `admin` | Control total | Todos |
+| `secretaria` | Administración general | Jugadores, Equipos, Pagos, Calendario, Sanciones, Actas, Reportes |
+| `delegado` | Presidente de club | Mis Jugadores, Mi Club, Mis Pases, Mi Nómina |
+| `capitan` | Capitán del equipo | Cerrar Acta |
+| `vocal` | Vocal semanal | Planilla, Partido en Curso, Validar Carnets, Novedades |
+| `arbitro` | Árbitro externo | Partido en Curso, Tarjetas, Goles, Novedades |
 
 ---
 
 ## 🛠 Tecnologías
 
-| Herramienta | Uso |
-|---|---|
-| React 19 | Framework principal |
-| Vite | Build tool |
-| React Router v7 | Navegación SPA |
-| Tailwind CSS 3 | Estilos |
-| Supabase | Backend (PostgreSQL, Auth, Storage, Edge Functions) |
-| Lucide React | Iconos |
-| React Hot Toast | Notificaciones |
-| `jspdf` / `jspdf-autotable` | Generación de PDFs de Actas y Nóminas |
-| `xlsx` | Lectura/escritura de archivos Excel |
+| Herramienta | Versión | Uso |
+|---|---|---|
+| React | 19 | Framework principal |
+| Vite | 8 | Build tool |
+| React Router | 7 | Navegación |
+| Tailwind CSS | 3 | Estilos |
+| Supabase | 2 | Backend (BD, Auth, Storage) |
+| Lucide React | Latest | Iconos |
+| React Hot Toast | Latest | Notificaciones |
+| xlsx | Latest | Lectura de archivos Excel |
+
+**Base de datos:** PostgreSQL (vía Supabase, región São Paulo)
 
 ---
 
 ## 📁 Estructura del proyecto
 
-```text
+```
 liga-izurieta-admin/
+├── public/
+│   └── (favicon, etc)
 ├── src/
 │   ├── assets/
 │   │   └── escudo-liga.png         # Logo de la liga
@@ -150,49 +181,54 @@ liga-izurieta-admin/
 │   │   ├── Sidebar.jsx              # Menú lateral por rol
 │   │   ├── Layout.jsx               # Envoltorio general
 │   │   ├── ProtectedRoute.jsx       # Protección de rutas
+│   │   ├── CarnetDigitalCard.jsx    # Credencial digital oficial CR80
+│   │   ├── EquipoFormDrawer.jsx     # Formulario crear/editar equipo
 │   │   ├── JugadorFormDrawer.jsx    # Formulario crear/editar jugador
-│   │   ├── JugadorDetalleDrawer.jsx # Detalle completo del jugador
-│   │   ├── UsuarioFormDrawer.jsx    # Crear/editar usuarios
-│   │   └── PeriodoInscripcionDrawer.jsx
+│   │   ├── JugadorDetalleDrawer.jsx # Detalle completo, pase, calificar y consentimiento
+│   │   ├── PeriodoInscripcionDrawer.jsx # Configuración de periodo de pases
+│   │   └── UsuarioFormDrawer.jsx    # Crear/editar usuarios
 │   ├── contexts/
 │   │   └── AuthContext.jsx          # Manejo de autenticación y roles
 │   ├── lib/
-│   │   ├── supabase.js              # Cliente de Supabase
-│   │   ├── imagenUtils.js           # Compresión de imágenes
-│   │   ├── fotoUtils.js             # Subida de fotos a Storage
-│   │   └── escudoUtils.js           # Subida de escudos a Storage
+│   │   └── supabase.js              # Cliente de Supabase
 │   ├── pages/
-│   │   ├── Login.jsx
-│   │   ├── Dashboard.jsx
-│   │   ├── Jugadores.jsx
-│   │   ├── ImportarJugadores.jsx
-│   │   ├── Usuarios.jsx
-│   │   ├── Equipos.jsx
-│   │   ├── Pagos.jsx
-│   │   ├── Calendario.jsx
-│   │   ├── Sanciones.jsx
-│   │   ├── Actas.jsx
-│   │   ├── Reportes.jsx
-│   │   ├── Configuracion.jsx
-│   │   ├── MisJugadores.jsx         # Panel Presidente
-│   │   ├── MiClub.jsx               # Panel Presidente
-│   │   └── MiNomina.jsx             # Panel Presidente
+│   │   ├── Login.jsx                # Inicio de sesión
+│   │   ├── Dashboard.jsx            # Panel principal con resumen
+│   │   ├── Jugadores.jsx            # Gestión de jugadores
+│   │   ├── MisJugadores.jsx         # Panel de delegado / presidente
+│   │   ├── MiCarnet.jsx             # Portal del jugador y carnet digital
+│   │   ├── Equipos.jsx              # Gestión de clubes
+│   │   ├── Pagos.jsx                # Tesorería, pagos de carnet y deudas/multas
+│   │   ├── Calendario.jsx           # Calendario de encuentros
+│   │   ├── Sanciones.jsx            # Módulo disciplinario
+│   │   ├── Actas.jsx                # Control de actas y vocales
+│   │   ├── Reportes.jsx             # Informes e impresiones
+│   │   ├── Usuarios.jsx             # Administración de usuarios
+│   │   └── ImportarJugadores.jsx    # Carga masiva desde Excel
 │   ├── App.jsx                      # Rutas principales
 │   ├── main.jsx                     # Punto de entrada
-│   └── index.css                    # Tailwind
+│   └── index.css                    # Estilos globales
 ├── .env.local                       # Variables de entorno (NO subir a Git)
+├── .gitignore
+├── index.html
 ├── package.json
+├── postcss.config.js
 ├── tailwind.config.js
 └── vite.config.js
+```
 
-## ⚙️ Instalación Local
+---
+
+## ⚙️ Instalación
 
 ### Requisitos previos
+
 - Node.js 20 o superior
 - npm 10 o superior
-- Cuenta en Supabase
+- Cuenta en [Supabase](https://supabase.com)
 
 ### Pasos
+
 ```bash
 # 1. Clonar el repositorio
 git clone https://github.com/lams1474/liga-izurieta-admin.git
@@ -201,11 +237,15 @@ cd liga-izurieta-admin
 # 2. Instalar dependencias
 npm install
 
-# 3. Crear archivo .env.local con las credenciales
-# (Ver sección de Configuración abajo)
+# 3. Copiar el archivo de ejemplo de variables
+cp .env.example .env.local
 
-# 4. Arrancar el servidor de desarrollo
+# 4. Editar .env.local con tus credenciales de Supabase
+# (ver sección Configuración)
+
+# 5. Arrancar el servidor de desarrollo
 npm run dev
+```
 
 La aplicación estará disponible en `http://localhost:5173`.
 
@@ -213,46 +253,110 @@ La aplicación estará disponible en `http://localhost:5173`.
 
 ## 🔧 Configuración
 
-### Variables de entorno (`.env.local`)
+### Variables de entorno
 
-Crea un archivo llamado `.env.local` en la raíz del proyecto con el siguiente contenido:
+Crear el archivo `.env.local` en la raíz del proyecto con:
 
 ```env
 VITE_SUPABASE_URL=https://gylnajxmlalnyueanhll.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
 
-## 📜 Scripts disponibles
-Comando	Descripción
-npm run dev	Inicia el servidor de desarrollo
-npm run build	Compila para producción
-npm run preview	Previsualiza la build de producción
-npm run lint	Ejecuta ESLint
+**⚠️ IMPORTANTE:** Este archivo **NO debe subirse a GitHub**. Ya está protegido
+por `.gitignore`.
 
-## 🔒 Seguridad
-Row Level Security (RLS) habilitado en todas las tablas de Supabase para proteger los datos según el rol del usuario.
+### Obtener las credenciales
 
-Edge Function (crear-usuario): Utiliza la service_role_key de forma segura (del lado del servidor) para crear usuarios en Auth y en la tabla usuarios. La llave privada nunca se expone en el cliente.
-
-Autenticación persistente y segura con Supabase Auth.
-
-Cumplimiento estricto de la Ley Orgánica de Protección de Datos Personales (LOPDP) de Ecuador (consentimiento informado y registro de tutores para menores de edad).
-
-## 👨‍💻 Autor
-Luis Maigua
-
-GitHub: @lams1474
-
-Email: ligajoseizurieta@gmail.com
-
-Última actualización: Octubre 2026
-
+1. Ir a [Supabase Dashboard](https://supabase.com/dashboard)
+2. Abrir el proyecto **App-liga-Izurieta**
+3. Ir a **Settings → API**
+4. Copiar `Project URL` y `anon public key`
 
 ---
 
-### Para subirlo a GitHub:
+## 📜 Scripts disponibles
 
-```cmd
-cd C:\Users\USER\Desktop\liga-izurieta-admin
-git add README.md
-git commit -m "Docs: formatear correctamente seccion final del README"
-git push
+| Comando | Descripción |
+|---|---|
+| `npm run dev` | Inicia el servidor de desarrollo |
+| `npm run build` | Compila para producción |
+| `npm run preview` | Previsualiza la build de producción |
+| `npm run lint` | Ejecuta ESLint |
+
+---
+
+## 📐 Convenciones
+
+### Nombres de archivos
+
+- **Componentes:** `PascalCase.jsx` (ej: `JugadorFormDrawer.jsx`)
+- **Páginas:** `PascalCase.jsx` (ej: `Jugadores.jsx`)
+- **Utilidades:** `camelCase.js` (ej: `supabase.js`)
+- **Contextos:** `PascalCase.jsx` (ej: `AuthContext.jsx`)
+
+### Estructura de un componente
+
+```jsx
+// 1. Imports
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+
+// 2. Componente principal
+export default function MiComponente() {
+  // 3. Hooks (useState, useEffect, useNavigate, etc.)
+  // 4. Estados
+  // 5. Efectos
+  // 6. Funciones auxiliares
+  // 7. Funciones de eventos
+  // 8. Render
+}
+```
+
+### Estilos
+
+- **Tailwind CSS** para todos los estilos
+- Paleta personalizada:
+  - `liga-azul` (#1e3a8a)
+  - `liga-rojo` (#dc2626)
+  - `liga-amarillo` (#fbbf24)
+  - `liga-verde` (#16a34a)
+
+### Idioma
+
+- **Código:** en inglés cuando es convención (variables, funciones, etc.)
+- **UI:** 100% en español
+- **Comentarios:** en español
+- **Commits:** en español
+
+---
+
+## 🔒 Seguridad
+
+- Row Level Security (RLS) habilitado en **todas las tablas** de Supabase
+- Políticas específicas por rol (admin, secretaria, delegado, etc.)
+- Credenciales manejadas en variables de entorno
+- Autenticación con Supabase Auth
+- Sesión persistente y controlada
+- Cumplimiento con Ley de Protección de Datos Personales (LOPDP) de Ecuador
+
+---
+
+## 📄 Licencia
+
+Sistema propietario de la **Liga Deportiva Barrial José Ignacio Izurieta**.
+
+Uso exclusivo de la liga y sus clubes afiliados.
+
+---
+
+## 👨‍💻 Autor
+
+**Luis Maigua**
+- GitHub: [@lams1474](https://github.com/lams1474)
+- Email: ligajoseizurieta@gmail.com
+
+---
+
+## 🗓 Última actualización
+
+Octubre 2026
