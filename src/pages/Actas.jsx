@@ -94,10 +94,8 @@ export default function Actas() {
         setPlanilla(planillaCargada)
       }
 
-      // === CARGA DE EVENTOS SIN DUPLICADOS ===
+      // Carga de eventos sin duplicados
       const { data: goles } = await supabase.from('goles').select('*, jugador:jugadores(id, apellidos, nombres)').eq('partido_id', partido.id)
-      
-      // Usamos un Map para evitar duplicados por ID de sanción
       const tarjetasRaw = await supabase.from('sanciones_jugador')
         .select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)')
         .eq('partido_id', partido.id)
@@ -154,15 +152,14 @@ export default function Actas() {
       const doc = new jsPDF()
       const p = partidoSeleccionado
       
-      // LIMPIEZA ULTRA AGRESIVA: Solo letras A-Z, números y espacios simples
       const clean = (str) => {
         if (!str) return '';
         return String(str)
           .replace(/ñ/g, 'n')
           .replace(/Ñ/g, 'N')
-          .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quita tildes
-          .replace(/[^a-zA-Z0-9 ]/g, '') // Quita todo lo que no sea letra/número/espacio
-          .replace(/\s+/g, ' ') // Colapsa espacios dobles
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9 ]/g, '')
+          .replace(/\s+/g, ' ')
           .trim();
       }
 
@@ -293,9 +290,10 @@ export default function Actas() {
       const splitText = doc.splitTextToSize(clean(p.acta?.[0]?.observaciones || 'Sin novedades registradas.'), 175)
       doc.text(splitText, 15, nextY + 6)
       
+      // Bajar la línea de firmas 4 cm (aprox 150 puntos)
       let lineY = nextY + 6 + (splitText.length * 5) + 10
 
-      const firmaY = Math.min(lineY + 50, 240)
+      const firmaY = Math.min(lineY + 150, 260)
       
       const fArbitro = firmas.find(f => f.firmante_tipo === 'arbitro')
       const fCapLocal = firmas.find(f => f.firmante_tipo === 'capitan_local' || f.firmante_tipo === 'local')
@@ -336,17 +334,7 @@ export default function Actas() {
       const nombreLocal = clean(p.local?.nombre) || 'Local';
       const nombreVisitante = clean(p.visitante?.nombre) || 'Visitante';
       
-      // Forzar descarga de PDF
-      const pdfBlob = doc.output('blob');
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Acta_${nombreLocal}_vs_${nombreVisitante}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
+      doc.save(`Acta_${nombreLocal}_vs_${nombreVisitante}.pdf`)
       toast.success('PDF Oficial descargado')
     } catch (err) {
       console.error("Error general en PDF:", err)
