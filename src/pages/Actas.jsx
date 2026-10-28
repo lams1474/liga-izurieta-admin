@@ -81,8 +81,11 @@ export default function Actas() {
         return (await Promise.all(promesas)).sort((a, b) => a.apellidos.localeCompare(b.apellidos))
       }
 
-      setJugadoresLocal(await cargarJugadores(partido.local.id))
-      setJugadoresVisitante(await cargarJugadores(partido.visitante.id))
+      const localJugadores = await cargarJugadores(partido.local.id)
+      const visitanteJugadores = await cargarJugadores(partido.visitante.id)
+
+      setJugadoresLocal(localJugadores)
+      setJugadoresVisitante(visitanteJugadores)
 
       const { data: planillaExistente } = await supabase.from('planilla_partido').select('*').eq('partido_id', partido.id)
       if (planillaExistente && planillaExistente.length > 0) {
@@ -95,14 +98,26 @@ export default function Actas() {
       const { data: tarjetas } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partido.id)
       
       let evs = []
-      if (goles) goles.forEach(g => evs.push({ tipo: 'gol', jugador_id: g.jugador.id, jugador: `${g.jugador.apellidos} ${g.jugador.nombres}`, equipo_id: null }))
-      if (tarjetas) tarjetas.forEach(t => evs.push({ 
-        tipo: t.tipo, 
-        jugador_id: t.jugador.id, 
-        jugador: `${t.jugador.apellidos} ${t.jugador.nombres}`, 
-        equipo_id: t.equipo?.id, 
-        motivo: t.motivo 
+      if (goles) goles.forEach(g => evs.push({ 
+        tipo: 'gol', 
+        jugador_id: g.jugador.id, 
+        jugador: `${g.jugador.apellidos} ${g.jugador.nombres}`, 
+        equipo_id: null 
       }))
+      
+      if (tarjetas) tarjetas.forEach(t => {
+        const dorsalEncontrado = localJugadores.find(j => j.id === t.jugador.id)?.dorsal 
+                              || visitanteJugadores.find(j => j.id === t.jugador.id)?.dorsal 
+                              || '?';
+        evs.push({ 
+          tipo: t.tipo, 
+          jugador_id: t.jugador.id, 
+          jugador: `${t.jugador.apellidos} ${t.jugador.nombres}`, 
+          equipo_id: t.equipo?.id, 
+          motivo: t.motivo,
+          dorsal: dorsalEncontrado
+        })
+      })
       
       setEventos(evs)
       setMarcador({ local: partido.goles_local || 0, visitante: partido.goles_visitante || 0 })
@@ -231,7 +246,7 @@ export default function Actas() {
           doc.text(`NO. ______`, 15, yAmarillas + (i*6))
           doc.line(35, yAmarillas + (i*6), 130, yAmarillas + (i*6))
           if (amarillas[i]) {
-            doc.text(clean(amarillas[i].jugador), 37, yAmarillas + (i*6) - 1)
+            doc.text(`${amarillas[i].dorsal} ${clean(amarillas[i].jugador)}`, 37, yAmarillas + (i*6) - 1)
             doc.text(`POR: ${clean(amarillas[i].motivo || '______')}`, 135, yAmarillas + (i*6))
           } else {
             doc.text(`POR: ________________`, 135, yAmarillas + (i*6))
@@ -247,7 +262,7 @@ export default function Actas() {
           doc.text(`NO. ______`, 15, yRojas + (i*6))
           doc.line(35, yRojas + (i*6), 130, yRojas + (i*6))
           if (rojas[i]) {
-            doc.text(clean(rojas[i].jugador), 37, yRojas + (i*6) - 1)
+            doc.text(`${rojas[i].dorsal} ${clean(rojas[i].jugador)}`, 37, yRojas + (i*6) - 1)
             doc.text(`POR: ${clean(rojas[i].motivo || '______')}`, 135, yRojas + (i*6))
           } else {
             doc.text(`POR: ________________`, 135, yRojas + (i*6))
@@ -382,7 +397,10 @@ export default function Actas() {
       const { data: t } = await supabase.from('sanciones_jugador').select('*, jugador:jugadores(id, apellidos, nombres), equipo:equipos(id)').eq('partido_id', partidoSeleccionado.id)
       let evs = []
       if (g) g.forEach(x => evs.push({ tipo: 'gol', jugador_id: x.jugador.id, jugador: `${x.jugador.apellidos} ${x.jugador.nombres}`, equipo_id: null }))
-      if (t) t.forEach(x => evs.push({ tipo: x.tipo, jugador_id: x.jugador.id, jugador: `${x.jugador.apellidos} ${x.jugador.nombres}`, equipo_id: x.equipo.id, motivo: x.motivo }))
+      if (t) t.forEach(x => {
+        const dorsalEncontrado = jugadoresLocal.find(j => j.id === x.jugador.id)?.dorsal || jugadoresVisitante.find(j => j.id === x.jugador.id)?.dorsal || '?'
+        evs.push({ tipo: x.tipo, jugador_id: x.jugador.id, jugador: `${x.jugador.apellidos} ${x.jugador.nombres}`, equipo_id: x.equipo.id, motivo: x.motivo, dorsal: dorsalEncontrado })
+      })
       setEventos(evs)
     } catch (err) {
       console.error(err)
@@ -505,7 +523,7 @@ export default function Actas() {
                 <ul className="space-y-2 text-sm">
                   {eventos.map((ev, i) => (
                     <li key={i} className="flex justify-between">
-                      <span className="font-semibold">{ev.jugador}</span>
+                      <span className="font-semibold">{ev.dorsal ? `${ev.dorsal} ` : ''}{ev.jugador}</span>
                       <span className="capitalize">{ev.tipo === 'amarilla' ? '🟨 Amarilla' : ev.tipo === 'roja' ? '🟥 Roja' : '⚽ Gol'}</span>
                     </li>
                   ))}
@@ -670,7 +688,7 @@ export default function Actas() {
           <div className="space-y-2">
             {eventos.map((ev, i) => (
               <div key={i} className="flex items-center gap-2 text-sm bg-gray-50 p-2 rounded">
-                <span className="font-bold">{ev.jugador}</span>
+                <span className="font-bold">{ev.dorsal ? `${ev.dorsal} ` : ''}{ev.jugador}</span>
                 <span className="text-gray-400">-</span>
                 <span className="capitalize">{ev.tipo === 'amarilla' ? '🟨 Tarjeta Amarilla' : ev.tipo === 'roja' ? '🟥 Tarjeta Roja' : '⚽ Gol'}</span>
                 {ev.motivo && <span className="text-gray-500 text-xs ml-auto">({ev.motivo})</span>}
