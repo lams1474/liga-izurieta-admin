@@ -7,16 +7,16 @@ import toast from 'react-hot-toast'
 
 export default function Pagos() {
   const { usuario } = useAuth()
-
+  
   const [vista, setVista] = useState('jugadores') // 'jugadores' | 'equipos'
-
+  
   // === ESTADOS JUGADORES ===
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState([])
   const [buscando, setBuscando] = useState(false)
   const [buscado, setBuscado] = useState(false)
   const [conceptoSeleccionado, setConceptoSeleccionado] = useState(null)
-
+  
   // === ESTADOS EQUIPOS ===
   const [equipos, setEquipos] = useState([])
   const [deudasEquipos, setDeudasEquipos] = useState([])
@@ -45,7 +45,7 @@ export default function Pagos() {
         id, concepto, monto, monto_pagado, fecha_emision,
         equipo:equipos!deudas_equipo_equipo_id_fkey (id, nombre)
       `).order('creado_en', { ascending: false })
-
+      
       setDeudasEquipos((deudas || []).filter(d => d.monto_pagado < d.monto))
     } catch (err) {
       console.error(err)
@@ -94,12 +94,6 @@ export default function Pagos() {
         })
         if (error) throw error;
       } else if (conceptoSeleccionado.tipo === 'deuda') {
-<<<<<<< Updated upstream
-        const { data: deudaActual } = await supabase.from('deudas_jugador').select('monto_pagado').eq('id', conceptoSeleccionado.id).single()
-        const actual = deudaActual?.monto_pagado || 0
-        const nuevoMontoPagado = actual + parseFloat(monto)
-        await supabase.from('deudas_jugador').update({ monto_pagado: nuevoMontoPagado }).eq('id', conceptoSeleccionado.id)
-=======
         // USAMOS EL NUEVO RPC PARA DEUDAS
         const { error } = await supabase.rpc('registrar_pago_deuda_jugador', {
           p_deuda_id: conceptoSeleccionado.id,
@@ -109,7 +103,6 @@ export default function Pagos() {
           p_observaciones: 'Cobro de multa/deuda'
         })
         if (error) throw error;
->>>>>>> Stashed changes
       }
       
       toast.success('Pago registrado correctamente')
@@ -128,7 +121,7 @@ export default function Pagos() {
   async function crearDeudaEquipo(e) {
     e.preventDefault()
     if (!nuevaDeudaEq.equipo_id || !nuevaDeudaEq.concepto || !nuevaDeudaEq.monto) return toast.error('Llena todos los campos')
-
+    
     setRegistrando(true)
     try {
       const { error } = await supabase.from('deudas_equipo').insert({
@@ -139,7 +132,7 @@ export default function Pagos() {
         registrado_por: usuario.id
       })
       if (error) throw error
-
+      
       toast.success('Deuda registrada al equipo')
       setModalDeudaEq(false)
       setNuevaDeudaEq({ equipo_id: '', concepto: '', monto: '' })
@@ -158,7 +151,7 @@ export default function Pagos() {
     if (!nuevaDeudaJugador.jugador_id || !nuevaDeudaJugador.equipo_id || !nuevaDeudaJugador.concepto || !nuevaDeudaJugador.monto) {
       return toast.error('Llena todos los campos obligatorios')
     }
-
+    
     setRegistrando(true)
     try {
       const { error } = await supabase.from('deudas_jugador').insert({
@@ -171,7 +164,7 @@ export default function Pagos() {
         fecha_vencimiento: nuevaDeudaJugador.fecha_vencimiento || null
       })
       if (error) throw error
-
+      
       toast.success('Multa registrada al jugador')
       setModalDeudaJugador(false)
       setNuevaDeudaJugador({ jugador_id: '', equipo_id: '', concepto: '', monto: '', fecha_vencimiento: '' })
@@ -191,7 +184,7 @@ export default function Pagos() {
     try {
       const { error } = await supabase.from('deudas_equipo').update({ monto_pagado: montoTotal }).eq('id', id)
       if (error) throw error
-
+      
       toast.success('Pago de equipo registrado')
       cargarEquiposYDeudas()
     } catch (err) {
@@ -257,20 +250,15 @@ export default function Pagos() {
                         <p className="text-sm text-gray-600">C.C. {jugador.cedula}</p>
                         {equipo && <p className="text-xs text-gray-500 mt-1">🏟️ {equipo.nombre} ({equipo.disciplina} · {equipo.categoria})</p>}
                       </div>
-<<<<<<< Updated upstream
-                      {/* NUEVO BOTÓN PARA AÑADIR MULTA AL JUGADOR */}
-                      <button
-=======
                       <button 
->>>>>>> Stashed changes
                         onClick={() => {
                           if (!equipo) return toast.error('El jugador no tiene un equipo activo asignado');
-                          setNuevaDeudaJugador({
-                            jugador_id: jugador.id,
-                            equipo_id: equipo.id,
-                            concepto: '',
-                            monto: '',
-                            fecha_vencimiento: ''
+                          setNuevaDeudaJugador({ 
+                            jugador_id: jugador.id, 
+                            equipo_id: equipo.id, 
+                            concepto: '', 
+                            monto: '', 
+                            fecha_vencimiento: '' 
                           });
                           setModalDeudaJugador(true);
                         }}
@@ -281,13 +269,8 @@ export default function Pagos() {
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-700 mb-2">Conceptos pendientes:</p>
-<<<<<<< Updated upstream
-
-                      {/* Carnet */}
-=======
                       
                       {/* Carnet - CORREGIDO FECHA 1969 */}
->>>>>>> Stashed changes
                       <div className="flex justify-between items-center bg-gray-50 p-3 rounded-md">
                         <div>
                           <p className="font-semibold text-sm">Carnet Digital {new Date().getFullYear()}</p>
@@ -313,7 +296,7 @@ export default function Pagos() {
                           <button onClick={() => { setConceptoSeleccionado({ tipo: 'deuda', id: deuda.id, jugador_id: jugador.id, monto: deuda.monto - deuda.monto_pagado, nombre: deuda.concepto }); setMonto((deuda.monto - deuda.monto_pagado).toFixed(2)) }} className="bg-liga-rojo text-white px-3 py-1.5 rounded text-sm font-semibold hover:bg-liga-rojo/90">Cobrar</button>
                         </div>
                       ))}
-
+                      
                       {pagadoEsteAno && deudasPendientes.length === 0 && <p className="text-sm text-green-600 font-semibold text-center py-2">✓ Sin deudas pendientes</p>}
                     </div>
                   </div>
