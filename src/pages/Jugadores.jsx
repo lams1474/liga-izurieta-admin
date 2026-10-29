@@ -285,26 +285,14 @@ export default function Jugadores() {
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center flex-shrink-0 border border-gray-300">
                             {j.foto_url ? (
-                              <img
-                                src={j.foto_url}
-                                alt={`${j.nombres} ${j.apellidos}`}
-                                className="w-full h-full object-cover"
-                              />
+                              <img src={j.foto_url} alt={`${j.nombres} ${j.apellidos}`} className="w-full h-full object-cover" />
                             ) : (
-                              <span className="text-xs font-bold text-gray-500">
-                                {j.nombres?.[0]}{j.apellidos?.[0]}
-                              </span>
+                              <span className="text-xs font-bold text-gray-500">{j.nombres?.[0]}{j.apellidos?.[0]}</span>
                             )}
                           </div>
                           <div>
-                            <div className="font-semibold text-gray-800">
-                              {j.apellidos} {j.nombres}
-                            </div>
-                            {j.es_menor && (
-                              <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
-                                Menor
-                              </span>
-                            )}
+                            <div className="font-semibold text-gray-800">{j.apellidos} {j.nombres}</div>
+                            {j.es_menor && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Menor</span>}
                           </div>
                         </div>
                       </td>

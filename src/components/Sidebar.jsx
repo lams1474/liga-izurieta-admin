@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Users, Building2, DollarSign, Calendar, AlertTriangle,
   FileText, BarChart3, UserCog, QrCode, Menu, X,
-  ShieldCheck, BookUser, Settings, Edit3 as PenTool
+  ShieldCheck, BookUser, Settings
 } from 'lucide-react'
 
 const menusPorRol = {
@@ -11,7 +11,6 @@ const menusPorRol = {
     { path: '/', label: 'Inicio', icon: Home },
     { path: '/jugadores', label: 'Jugadores', icon: Users },
     { path: '/equipos', label: 'Equipos', icon: Building2 },
-    { path: '/mi-carnet', label: 'Carnet Digital', icon: QrCode },
     { path: '/pagos', label: 'Pagos', icon: DollarSign },
     { path: '/calendario', label: 'Calendario', icon: Calendar },
     { path: '/sanciones', label: 'Sanciones', icon: AlertTriangle },
@@ -24,7 +23,6 @@ const menusPorRol = {
     { path: '/', label: 'Inicio', icon: Home },
     { path: '/jugadores', label: 'Jugadores', icon: Users },
     { path: '/equipos', label: 'Equipos', icon: Building2 },
-    { path: '/mi-carnet', label: 'Carnet Digital', icon: QrCode },
     { path: '/pagos', label: 'Pagos', icon: DollarSign },
     { path: '/calendario', label: 'Calendario', icon: Calendar },
     { path: '/sanciones', label: 'Sanciones', icon: AlertTriangle },
@@ -35,21 +33,16 @@ const menusPorRol = {
   delegado: [
     { path: '/', label: 'Inicio', icon: Home },
     { path: '/mis-jugadores', label: 'Mis Jugadores', icon: Users },
-    { path: '/mi-carnet', label: 'Carnet Digital', icon: QrCode },
     { path: '/mi-club', label: 'Mi Club', icon: ShieldCheck },
     { path: '/mis-pases', label: 'Mis Pases', icon: BookUser },
     { path: '/mi-nomina', label: 'Mi Nómina', icon: FileText },
   ],
   jugador: [
-    { path: '/', label: 'Inicio', icon: Home },
     { path: '/mi-carnet', label: 'Mi Carnet Digital', icon: QrCode },
-    { path: '/calendario', label: 'Mi Próximo Partido', icon: Calendar },
-    { path: '/sanciones', label: 'Mis Sanciones', icon: AlertTriangle },
   ],
   capitan: [
     { path: '/', label: 'Inicio', icon: Home },
-    { path: '/mi-carnet', label: 'Mi Carnet Digital', icon: QrCode },
-    { path: '/cerrar-acta', label: 'Cerrar Acta', icon: PenTool },
+    { path: '/actas', label: 'Actas', icon: FileText },
   ],
   vocal: [
     { path: '/', label: 'Inicio', icon: Home },

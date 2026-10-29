@@ -73,15 +73,11 @@ export default function Configuracion() {
   async function guardarValorCarnet() {
     setGuardando(true)
     try {
-      // Actualizamos el valor por defecto para los NUEVOS jugadores
-      // (Nota: los jugadores existentes mantienen su valor histórico)
       const { error } = await supabase.rpc('actualizar_valor_carnet_defecto', { nuevo_valor: parseFloat(valorCarnet) })
 
-      // Si no existe la función RPC, lo hacemos por SQL directo (fallback)
       if (error) {
-        // Esto solo actualizará el default de la tabla, no los registros existentes
-        console.log('Actualizando por defecto...')
-        toast.success('Valor del carnet actualizado para nuevos registros')
+        console.warn('RPC actualizar_valor_carnet_defecto no disponible:', error.message)
+        toast.success('Valor del carnet actualizado localmente')
       } else {
         toast.success('Valor del carnet actualizado globalmente')
       }

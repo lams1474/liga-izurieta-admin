@@ -1,13 +1,18 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useCallback } from 'react'
-import { FileCheck, CheckCircle2, Clock, Lock, Search, RefreshCw, Eye, X, Calendar, MapPin, UserCheck, Shield } from 'lucide-react'
+import { FileCheck, CheckCircle2, Clock, Lock, Eye, X, Calendar, MapPin, UserCheck, Shield, FileText } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Actas() {
-  const [cargando, setCargando] = useState(true)
+  const { usuario } = useAuth()
+
+  const [pestana, setPestana] = useState('pendientes')
   const [actas, setActas] = useState([])
-  const [busqueda, setBusqueda] = useState('')
+  const [cargando, setCargando] = useState(true)
+
+  const esCapitan = usuario?.rol === 'capitan'
 
   // Modal Ver Acta Completa
   const [actaSeleccionada, setActaSeleccionada] = useState(null)
@@ -43,60 +48,35 @@ export default function Actas() {
   }, [cargarActas])
 
   const actasFiltradas = actas.filter((a) => {
-    if (!busqueda) return true
-    const txt = busqueda.toLowerCase()
-    const loc = a.partido?.equipo_local?.nombre?.toLowerCase() || ''
-    const vis = a.partido?.equipo_visitante?.nombre?.toLowerCase() || ''
-    return loc.includes(txt) || vis.includes(txt)
+    if (pestana === 'pendientes') {
+      return a.estado === 'firmando' || a.estado === 'abierta'
+    } else {
+      return a.estado === 'cerrada'
+    }
   })
 
+  if (cargando) return <div className="p-8 text-center text-gray-500">Cargando actas...</div>
+
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Encabezado */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <FileCheck className="text-liga-azul" size={28} />
-            Módulo de Actas de Partido
-          </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Gestión de planillas de juego, ingreso de goles, novedades y firmas digitales
-          </p>
-        </div>
-      </div>
-
-      {/* Buscador */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-        <div className="relative w-full md:w-80">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por equipo..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-liga-azul"
-          />
-        </div>
-
-        <button
-          onClick={cargarActas}
-          className="p-2 text-gray-600 hover:text-liga-azul rounded-lg hover:bg-gray-100 transition-colors"
-          title="Recargar actas"
-        >
-          <RefreshCw size={18} />
-        </button>
-      </div>
-
-      {/* Tabla de Actas */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {cargando ? (
-          <div className="p-12 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-liga-azul mx-auto"></div>
-            <p className="mt-3 text-sm text-gray-500">Cargando actas de juego...</p>
+    <>
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-liga-azul">Actas y Planillas</h1>
+            <p className="text-gray-500 text-sm">Gestión de partidos</p>
           </div>
-        ) : actasFiltradas.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">
-            No hay actas registradas para los partidos actuales.
+          {!esCapitan && (
+            <div className="flex bg-white rounded-lg shadow-sm p-1">
+              <button onClick={() => setPestana('pendientes')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${pestana === 'pendientes' ? 'bg-liga-azul text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Pendientes</button>
+              <button onClick={() => setPestana('historial')} className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${pestana === 'historial' ? 'bg-liga-azul text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Historial de Actas</button>
+            </div>
+          )}
+        </div>
+
+        {actasFiltradas.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-md p-12 text-center text-gray-500">
+            <FileText size={48} className="mx-auto text-gray-300 mb-2" />
+            {pestana === 'pendientes' ? 'No hay partidos pendientes.' : 'No hay partidos finalizados.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -258,6 +238,6 @@ export default function Actas() {
           </div>
         </>
       )}
-    </div>
+    </>
   )
 }

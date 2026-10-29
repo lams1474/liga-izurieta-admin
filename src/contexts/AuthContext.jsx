@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext({})
@@ -7,24 +7,57 @@ export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null)
   const [cargando, setCargando] = useState(true)
 
-  async function cargarUsuario(userId) {
+  const cargarUsuario = useCallback(async (userId) => {
     try {
-      const { data, error } = await supabase
+      // 1. Buscar en usuarios (para admin, secretaria, delegado, etc.)
+      const { data: usuarioData } = await supabase
         .from('usuarios')
         .select(`
           id, nombres, apellidos, email, rol, activo, club_id, telefono,
           club:equipos!usuarios_club_id_fkey (id, nombre, disciplina, categoria)
         `)
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
-      if (error) throw error
+      // 2. Buscar también en jugadores por user_id
+      const { data: jugadorData } = await supabase
+        .from('jugadores')
+        .select(`
+          id, nombres, apellidos, cedula, foto_url, carnet_pagado, calificado,
+          inscripciones:jugador_equipo (
+            id, dorsal, activo,
+            equipo:equipos!jugador_equipo_equipo_id_fkey (id, nombre, disciplina, categoria, escudo_url)
+          )
+        `)
+        .eq('user_id', userId)
+        .maybeSingle()
 
-      if (!data.activo) {
+      // 3. Decidir el rol:
+      //    - Si está en usuarios Y es distinto de 'jugador' → usar usuarios
+      //    - Si está en jugadores → usar datos del jugador
+      //    - Si está en ambos → preferir jugadores si el rol es 'jugador'
+      if (usuarioData && usuarioData.activo && usuarioData.rol !== 'jugador') {
+        setUsuario(usuarioData)
+      } else if (jugadorData) {
+        setUsuario({
+          id: jugadorData.id,
+          nombres: jugadorData.nombres,
+          apellidos: jugadorData.apellidos,
+          email: usuarioData?.email || null,
+          rol: 'jugador',
+          activo: true,
+          club_id: null,
+          telefono: null,
+          jugador_id: jugadorData.id,        // ← IMPORTANTE
+          cedula: jugadorData.cedula,        // ← IMPORTANTE
+          foto_url: jugadorData.foto_url,
+        })
+      } else if (usuarioData && usuarioData.activo) {
+        setUsuario(usuarioData)
+      } else {
+        // No se encontró en ninguna tabla → cerrar sesión
         await supabase.auth.signOut()
         setUsuario(null)
-      } else {
-        setUsuario(data)
       }
     } catch (err) {
       console.error('Error cargando usuario:', err)
@@ -32,10 +65,9 @@ export function AuthProvider({ children }) {
     } finally {
       setCargando(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    // Verificar sesión inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         cargarUsuario(session.user.id)
@@ -44,7 +76,6 @@ export function AuthProvider({ children }) {
       }
     })
 
-    // Escuchar cambios de sesión
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (session) {
@@ -59,7 +90,7 @@ export function AuthProvider({ children }) {
     return () => {
       listener?.subscription?.unsubscribe()
     }
-  }, [])
+  }, [cargarUsuario])
 
   async function login(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({

@@ -178,6 +178,12 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
 
     if (form.tipo_pase && form.tipo_pase !== 'nuevo' && !form.club_anterior.trim()) nuevosErrores.club_anterior = 'Obligatorio'
 
+    if (!jugadorEditar && (esAdmin || esPresidente) && !form.equipo_id) {
+      nuevosErrores.equipo_id = 'Obligatorio'
+    }
+
+    if (form.tipo_pase && form.tipo_pase !== 'nuevo' && !form.club_anterior.trim()) nuevosErrores.club_anterior = 'Obligatorio'
+
     setErrores(nuevosErrores)
     return Object.keys(nuevosErrores).length === 0
   }
