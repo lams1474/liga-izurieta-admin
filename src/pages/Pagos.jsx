@@ -81,29 +81,44 @@ export default function Pagos() {
     setBuscando(false)
   }
 
-  // ============ REGISTRAR PAGO (Carnet o Multa Jugador) ============
+  // ============ REGISTRAR PAGO (Carnet o Multa Jugador) - CORREGIDO ============
   async function registrarPagoJugador() {
     if (!conceptoSeleccionado || !monto || parseFloat(monto) <= 0) return toast.error('Ingresa un monto válido')
     setRegistrando(true)
     try {
       if (conceptoSeleccionado.tipo === 'carnet') {
-        await supabase.rpc('registrar_pago_carnet', {
+        const { error } = await supabase.rpc('registrar_pago_carnet', {
           p_jugador_id: conceptoSeleccionado.jugador_id, p_monto: parseFloat(monto),
           p_forma_pago: formaPago, p_referencia: 'Pago presencial',
           p_registrado_por: usuario.id, p_observaciones: 'Cobro de carnet digital'
         })
+        if (error) throw error;
       } else if (conceptoSeleccionado.tipo === 'deuda') {
+<<<<<<< Updated upstream
         const { data: deudaActual } = await supabase.from('deudas_jugador').select('monto_pagado').eq('id', conceptoSeleccionado.id).single()
         const actual = deudaActual?.monto_pagado || 0
         const nuevoMontoPagado = actual + parseFloat(monto)
         await supabase.from('deudas_jugador').update({ monto_pagado: nuevoMontoPagado }).eq('id', conceptoSeleccionado.id)
+=======
+        // USAMOS EL NUEVO RPC PARA DEUDAS
+        const { error } = await supabase.rpc('registrar_pago_deuda_jugador', {
+          p_deuda_id: conceptoSeleccionado.id,
+          p_monto: parseFloat(monto),
+          p_forma_pago: formaPago,
+          p_registrado_por: usuario.id,
+          p_observaciones: 'Cobro de multa/deuda'
+        })
+        if (error) throw error;
+>>>>>>> Stashed changes
       }
+      
       toast.success('Pago registrado correctamente')
-      buscar()
       setConceptoSeleccionado(null)
+      setMonto('') 
+      buscar() 
     } catch (err) {
-      console.error(err)
-      toast.error('Error al registrar pago')
+      console.error("Error detallado de Supabase:", err)
+      toast.error(err.message || 'Error al registrar pago')
     } finally {
       setRegistrando(false)
     }
@@ -137,7 +152,7 @@ export default function Pagos() {
     }
   }
 
-  // ============ NUEVO: CREAR DEUDA A JUGADOR ============
+  // ============ CREAR DEUDA A JUGADOR ============
   async function crearDeudaJugador(e) {
     e.preventDefault()
     if (!nuevaDeudaJugador.jugador_id || !nuevaDeudaJugador.equipo_id || !nuevaDeudaJugador.concepto || !nuevaDeudaJugador.monto) {
@@ -160,7 +175,7 @@ export default function Pagos() {
       toast.success('Multa registrada al jugador')
       setModalDeudaJugador(false)
       setNuevaDeudaJugador({ jugador_id: '', equipo_id: '', concepto: '', monto: '', fecha_vencimiento: '' })
-      buscar() // Recargar resultados
+      buscar() 
     } catch (err) {
       console.error(err)
       toast.error('Error al crear multa al jugador')
@@ -242,8 +257,12 @@ export default function Pagos() {
                         <p className="text-sm text-gray-600">C.C. {jugador.cedula}</p>
                         {equipo && <p className="text-xs text-gray-500 mt-1">🏟️ {equipo.nombre} ({equipo.disciplina} · {equipo.categoria})</p>}
                       </div>
+<<<<<<< Updated upstream
                       {/* NUEVO BOTÓN PARA AÑADIR MULTA AL JUGADOR */}
                       <button
+=======
+                      <button 
+>>>>>>> Stashed changes
                         onClick={() => {
                           if (!equipo) return toast.error('El jugador no tiene un equipo activo asignado');
                           setNuevaDeudaJugador({
@@ -262,12 +281,24 @@ export default function Pagos() {
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-700 mb-2">Conceptos pendientes:</p>
+<<<<<<< Updated upstream
 
                       {/* Carnet */}
+=======
+                      
+                      {/* Carnet - CORREGIDO FECHA 1969 */}
+>>>>>>> Stashed changes
                       <div className="flex justify-between items-center bg-gray-50 p-3 rounded-md">
                         <div>
                           <p className="font-semibold text-sm">Carnet Digital {new Date().getFullYear()}</p>
-                          {pagadoEsteAno ? <p className="text-xs text-green-600 font-semibold flex items-center gap-1 mt-1"><CheckCircle size={14} /> Pagado el {new Date(jugador.carnet_pagado_en).toLocaleDateString('es-EC')}</p> : <p className="text-xs text-red-600 font-semibold mt-1">Pendiente ($1.00)</p>}
+                          {pagadoEsteAno ? (
+                            <p className="text-xs text-green-600 font-semibold flex items-center gap-1 mt-1">
+                              <CheckCircle size={14} /> 
+                              Pagado el {jugador.carnet_pagado_en ? new Date(jugador.carnet_pagado_en).toLocaleDateString('es-EC') : 'Fecha no registrada'}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-red-600 font-semibold mt-1">Pendiente ($1.00)</p>
+                          )}
                         </div>
                         {!pagadoEsteAno && <button onClick={() => { setConceptoSeleccionado({ tipo: 'carnet', jugador_id: jugador.id, monto: 1.00, nombre: `Carnet Digital - ${jugador.apellidos}` }); setMonto('1.00') }} className="bg-liga-rojo text-white px-3 py-1.5 rounded text-sm font-semibold hover:bg-liga-rojo/90">Cobrar</button>}
                       </div>
@@ -279,7 +310,7 @@ export default function Pagos() {
                             <p className="font-semibold text-sm flex items-center gap-1 text-red-800"><ShieldAlert size={16} /> {deuda.concepto}</p>
                             <p className="text-xs text-red-600 font-semibold mt-1">Pendiente: ${(deuda.monto - deuda.monto_pagado).toFixed(2)}</p>
                           </div>
-                          <button onClick={() => { setConceptoSeleccionado({ tipo: 'deuda', id: deuda.id, monto: deuda.monto - deuda.monto_pagado, nombre: deuda.concepto }); setMonto((deuda.monto - deuda.monto_pagado).toFixed(2)) }} className="bg-liga-rojo text-white px-3 py-1.5 rounded text-sm font-semibold hover:bg-liga-rojo/90">Cobrar</button>
+                          <button onClick={() => { setConceptoSeleccionado({ tipo: 'deuda', id: deuda.id, jugador_id: jugador.id, monto: deuda.monto - deuda.monto_pagado, nombre: deuda.concepto }); setMonto((deuda.monto - deuda.monto_pagado).toFixed(2)) }} className="bg-liga-rojo text-white px-3 py-1.5 rounded text-sm font-semibold hover:bg-liga-rojo/90">Cobrar</button>
                         </div>
                       ))}
 
@@ -398,7 +429,7 @@ export default function Pagos() {
         </div>
       )}
 
-      {/* ================= NUEVO: MODAL NUEVA DEUDA JUGADOR ================= */}
+      {/* ================= MODAL NUEVA DEUDA JUGADOR ================= */}
       {modalDeudaJugador && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <form onSubmit={crearDeudaJugador} className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
