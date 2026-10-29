@@ -21,15 +21,20 @@ export default function Actas() {
   const cargarActas = useCallback(async () => {
     setCargando(true)
     try {
+      // MEJORA: Traemos los detalles de faltas, goles, arbitro y firmas
       const { data, error } = await supabase
         .from('actas')
         .select(`
-          id, estado, observaciones, fecha_cierre, firmado_vocal, firmado_arbitro,
+          id, estado, observaciones, cerrada_en,
           partido:partidos (
-            id, fecha_partido, hora_partido, lugar, goles_local, goles_visitante, estado,
+            id, fecha, hora, cancha, goles_local, goles_visitante, estado,
             equipo_local:equipos!partidos_equipo_local_id_fkey (id, nombre, disciplina, categoria),
-            equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina, categoria)
-          )
+            equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina, categoria),
+            arbitro:arbitros (nombres, apellidos),
+            faltas:faltas_partido (id, tipo, minuto, jugador:jugadores (nombres, apellidos, dorsal), equipo:equipos (nombre)),
+            goles:goles (id, minuto, jugador:jugadores (nombres, apellidos), equipo:equipos (nombre))
+          ),
+          firmas:firmas_acta (firmante_tipo, firmado_en)
         `)
         .order('creado_en', { ascending: false })
 
@@ -161,7 +166,7 @@ export default function Actas() {
                   <Calendar size={16} className="text-liga-azul" />
                   <div>
                     <p className="font-semibold text-gray-500 uppercase">Fecha y Hora</p>
-                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.fecha_partido || 'Sin fecha'} · {actaSeleccionada.partido?.hora_partido?.substring(0, 5) || '--:--'}</p>
+                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.fecha || 'Sin fecha'} · {actaSeleccionada.partido?.hora?.substring(0, 5) || '--:--'}</p>
                   </div>
                 </div>
 
@@ -169,7 +174,7 @@ export default function Actas() {
                   <MapPin size={16} className="text-liga-azul" />
                   <div>
                     <p className="font-semibold text-gray-500 uppercase">Lugar / Cancha</p>
-                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.lugar || 'Cancha Oficial'}</p>
+                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.cancha || 'Cancha Oficial'}</p>
                   </div>
                 </div>
 
