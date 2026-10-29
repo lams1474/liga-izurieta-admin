@@ -19,7 +19,7 @@ export default function Equipos() {
   const [modalPlantilla, setModalPlantilla] = useState(false)
   const [modalEditar, setModalEditar] = useState(false)
   const [equipoSeleccionado, setEquipoSeleccionado] = useState(null)
-  
+
   // Datos de plantilla y edición
   const [plantilla, setPlantilla] = useState([])
   const [cargandoPlantilla, setCargandoPlantilla] = useState(false)
@@ -82,12 +82,12 @@ export default function Equipos() {
         .eq('activo', true)
 
       if (error) throw error
-      
+
       const lista = (data || [])
         .filter(i => i.jugador)
         .map(i => ({ ...i.jugador, dorsal: i.dorsal, posicion: i.posicion }))
         .sort((a, b) => a.apellidos.localeCompare(b.apellidos))
-        
+
       setPlantilla(lista)
     } catch (err) {
       console.error(err)
@@ -100,10 +100,10 @@ export default function Equipos() {
   // Abrir Edición
   function abrirEditar(equipo) {
     setEquipoSeleccionado(equipo)
-    setFormEditar({ 
-      nombre: equipo.nombre, 
-      colores: equipo.colores || '', 
-      escudo_url: equipo.escudo_url || '' 
+    setFormEditar({
+      nombre: equipo.nombre,
+      colores: equipo.colores || '',
+      escudo_url: equipo.escudo_url || ''
     })
     setModalEditar(true)
   }
@@ -126,7 +126,7 @@ export default function Equipos() {
     try {
       const comprimida = await comprimirImagen(file, { maxAncho: 500, maxAlto: 500, calidad: 0.9 })
       const url = await subirEscudo(comprimida, equipoSeleccionado.id)
-      
+
       setFormEditar(prev => ({ ...prev, escudo_url: url }))
       toast.success('Escudo subido. Guarda los cambios.', { id: 'escudo-admin' })
     } catch (err) {
@@ -153,7 +153,7 @@ export default function Equipos() {
         .eq('id', equipoSeleccionado.id)
 
       if (error) throw error
-      
+
       toast.success('Equipo actualizado')
       setModalEditar(false)
       cargarEquipos()
@@ -236,7 +236,7 @@ export default function Equipos() {
               </div>
               <h3 className="text-lg font-bold text-gray-800">{eq.nombre}</h3>
               <p className="text-sm text-gray-500 capitalize">{eq.disciplina} · {eq.categoria}</p>
-              
+
               <div className="flex items-center gap-1 mt-2 text-sm font-semibold text-liga-azul bg-blue-50 px-3 py-1 rounded-full">
                 <Users size={14} /> {countJugadores} jugadores
               </div>
@@ -271,7 +271,7 @@ export default function Equipos() {
               </div>
               <button onClick={() => setModalPlantilla(false)} className="p-2 hover:bg-white/20 rounded-md"><X size={20} /></button>
             </div>
-            
+
             <div className="p-4 overflow-y-auto flex-1">
               {cargandoPlantilla ? (
                 <div className="text-center py-8 text-gray-500">Cargando jugadores...</div>
@@ -315,7 +315,7 @@ export default function Equipos() {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <form onSubmit={guardarEdicion} className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
             <h3 className="text-xl font-bold text-liga-azul mb-4">Editar Equipo</h3>
-            
+
             <div className="flex flex-col items-center mb-4">
               <div className="relative w-24 h-24 rounded-full border-4 border-gray-200 bg-gray-100 flex items-center justify-center overflow-hidden mb-2">
                 {formEditar.escudo_url ? (

@@ -21,7 +21,7 @@ export default function CarnetDigitalCard({ jugador, equipo }) {
         setScale(Math.min(width / 600, 1))
       }
     }
-    
+
     // Ejecutar al montar y al redimensionar
     updateScale()
     window.addEventListener('resize', updateScale)
@@ -30,17 +30,17 @@ export default function CarnetDigitalCard({ jugador, equipo }) {
 
   return (
     // Contenedor responsivo: ocupa el 100% del ancho (hasta 600px) y ajusta su altura
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className="w-full max-w-[600px] mx-auto overflow-hidden relative"
-      style={{ height: `${400 * scale}px` }} 
+      style={{ height: `${400 * scale}px` }}
     >
       {/* EL CARNET ORIGINAL (Código intacto, mismas medidas 600x400) */}
-      <div 
+      <div
         className="absolute top-0 left-0 w-[600px] h-[400px] bg-blue-900 rounded-2xl shadow-2xl overflow-hidden origin-top-left print:shadow-none print:rounded-none"
         style={{ transform: `scale(${scale})` }}
       >
-        
+
         {/* 1. IMAGEN DE FONDO */}
         <img src={carnetFondo} alt="Fondo Carnet" className="absolute inset-0 w-full h-full object-cover z-0" />
 
@@ -83,7 +83,7 @@ export default function CarnetDigitalCard({ jugador, equipo }) {
             </div>
           )}
         </div>
-        
+
         {/* 6. SELLO DE LA LIGA */}
         <div className="absolute top-[5%] left-[3%] z-10 w-24 h-24 drop-shadow-lg">
           <img src={selloLiga} alt="Sello Liga" className="w-full h-full object-contain" />

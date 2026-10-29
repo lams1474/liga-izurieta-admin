@@ -296,8 +296,10 @@ export default function Jugadores() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-600">{j.cedula}</td>
-                      
+                      <td className="px-3 py-3 text-sm text-gray-600">
+                        {j.cedula}
+                      </td>
+
                       {/* AQUI MOSTRAMOS TODAS LAS DISCIPLINAS ACTIVAS */}
                       <td className="px-3 py-3 text-sm">
                         {inscripcionesActivas.length > 0 ? (

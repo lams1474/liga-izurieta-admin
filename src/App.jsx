@@ -10,7 +10,7 @@ import Calendario from './pages/Calendario'
 import Sanciones from './pages/Sanciones'
 import Actas from './pages/Actas'
 import Reportes from './pages/Reportes'
-import Configuracion from './pages/Configuracion' // <-- NUEVO IMPORT
+import Configuracion from './pages/Configuracion'
 import MiCarnet from './pages/MiCarnet'
 import MisJugadores from './pages/MisJugadores'
 import RegistroJugador from './pages/RegistroJugador'
@@ -20,16 +20,13 @@ import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
 
-// Componente que decide qué mostrar en "/" según el rol
 function HomeRedirect() {
   const { usuario } = useAuth()
 
-  // Los jugadores van directo a su carnet
   if (usuario?.rol === 'jugador') {
     return <Navigate to="/mi-carnet" replace />
   }
 
-  // Los demás ven el Dashboard
   return <Dashboard />
 }
 
@@ -169,7 +166,6 @@ function App() {
         }
       />
 
-      {/* NUEVA RUTA: CONFIGURACIÓN */}
       <Route
         path="/configuracion"
         element={
@@ -181,7 +177,6 @@ function App() {
         }
       />
 
-      {/* Ruta del carnet - accesible para TODOS los roles */}
       <Route
         path="/mi-carnet"
         element={
@@ -204,7 +199,6 @@ function App() {
         }
       />
 
-      {/* Rutas del Presidente */}
       <Route
         path="/mis-jugadores"
         element={

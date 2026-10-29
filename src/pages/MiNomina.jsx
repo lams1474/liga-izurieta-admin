@@ -39,8 +39,8 @@ export default function MiNomina() {
             id,
             dorsal,
             jugador:jugadores!jugador_equipo_jugador_id_fkey (
-              codigo_interno, apellidos, nombres, cedula, 
-              estado_pase, calificado, carnet_pagado, 
+              codigo_interno, apellidos, nombres, cedula,
+              estado_pase, calificado, carnet_pagado,
               foto_actualizada, consentimiento_firmado
             )
           `)
@@ -103,7 +103,7 @@ export default function MiNomina() {
       const hoja = XLSX.utils.json_to_sheet(datos)
       const libro = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(libro, hoja, 'Nómina')
-      
+
       hoja['!cols'] = [
         { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 8 },
         { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 20 }
@@ -122,7 +122,7 @@ export default function MiNomina() {
   function exportarPDF() {
     try {
       const doc = new jsPDF()
-      
+
       const nombreClub = club?.nombre || 'CLUB'
       const disciplina = club?.disciplina ? club.disciplina.toUpperCase() : 'N/A'
       const categoria = club?.categoria ? club.categoria.toUpperCase() : 'N/A'
@@ -131,11 +131,11 @@ export default function MiNomina() {
       doc.setFontSize(16)
       doc.setTextColor(30, 58, 138) // Azul liga
       doc.text('LIGA DEPORTIVA BARRIAL JOSE IGNACIO IZURIETA', 14, 20)
-      
+
       doc.setFontSize(14)
       doc.setTextColor(0, 0, 0)
       doc.text(`NOMINA DE JUGADORES - ${nombreClub}`, 14, 30)
-      
+
       doc.setFontSize(10)
       doc.text(`Disciplina: ${disciplina} | Categoria: ${categoria}`, 14, 37)
       doc.text(`Fecha de emision: ${new Date().toLocaleDateString('es-EC')}`, 14, 43)
@@ -175,7 +175,7 @@ export default function MiNomina() {
   }
 
   // ============ RENDER ============
-  
+
   if (!clubId) {
     return (
       <div className="max-w-4xl">
@@ -300,8 +300,8 @@ export default function MiNomina() {
                       </td>
                       <td className="px-3 py-3 text-center">
                         <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                          esCalificado 
-                            ? 'bg-green-100 text-green-700' 
+                          esCalificado
+                            ? 'bg-green-100 text-green-700'
                             : 'bg-red-100 text-red-700'
                         }`}>
                           {estado}

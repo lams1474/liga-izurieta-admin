@@ -20,7 +20,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
   const [historial, setHistorial] = useState([])
   const [sanciones, setSanciones] = useState([])
   const [deudas, setDeudas] = useState([])
-  
+
   const [modalPago, setModalPago] = useState(false)
   const [modalBaja, setModalBaja] = useState(null)
   const [modalCarnet, setModalCarnet] = useState(false)
@@ -122,6 +122,21 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
     }
   }
 
+  async function cambiarEstadoActivo(act) {
+    setGuardando(true)
+    try {
+      await supabase.from('jugadores').update({ activo: act }).eq('id', jugadorId)
+      toast.success(act ? 'Jugador activado globalmente' : 'Jugador inactivado globalmente')
+      await cargarTodo()
+      onCambio?.()
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al cambiar estado')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   async function cambiarCalificacionEquipo(inscripcionId, cal) {
     setGuardando(true)
     try {
@@ -141,11 +156,9 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
   async function cambiarEstadoPaseEquipo(inscripcionId, nuevoEstado) {
     setGuardando(true)
     try {
-      // Actualizamos la inscripción específica del equipo
       const { error: err1 } = await supabase.from('jugador_equipo').update({ estado_pase: nuevoEstado }).eq('id', inscripcionId)
       if (err1) throw err1
 
-      // También actualizamos el estado general del jugador (por si acaso la interfaz lee de ahí)
       await supabase.from('jugadores').update({ estado_pase: nuevoEstado }).eq('id', jugadorId)
 
       toast.success(`Pase ${nuevoEstado}`)
@@ -159,43 +172,28 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
     }
   }
 
-  async function cambiarEstadoActivo(act) {
-    setGuardando(true)
-    try {
-      await supabase.from('jugadores').update({ activo: act }).eq('id', jugadorId)
-      toast.success(act ? 'Jugador activado globalmente' : 'Jugador inactivado globalmente')
-      await cargarTodo()
-      onCambio?.()
-    } catch (err) {
-      console.error(err)
-      toast.error('Error al cambiar estado')
-    } finally {
-      setGuardando(false)
-    }
-  }
-
   async function eliminarJugador() {
     if (!window.confirm("⚠️ ¿Estás seguro de ELIMINAR a este jugador permanentemente? Esta acción no se puede deshacer y solo funciona si el jugador no ha jugado ningún partido.")) return;
-    
+
     setGuardando(true);
     try {
       const { count: eventosCount } = await supabase.from('goles').select('*', { count: 'exact', head: true }).eq('jugador_id', jugadorId);
       const { count: sancionesCount } = await supabase.from('sanciones_jugador').select('*', { count: 'exact', head: true }).eq('jugador_id', jugadorId);
-      
+
       if (eventosCount > 0 || sancionesCount > 0) {
         throw new Error('No se puede eliminar: el jugador ya tiene historial (goles o tarjetas). Usa el botón "Inactivar Jugador" en su lugar.');
       }
 
       await supabase.from('jugador_equipo').delete().eq('jugador_id', jugadorId);
       await supabase.from('historial_clubes_jugador').delete().eq('jugador_id', jugadorId);
-      
+
       const { error } = await supabase.from('jugadores').delete().eq('id', jugadorId);
       if (error) throw error;
 
       toast.success('Jugador eliminado correctamente');
       onCerrar();
       onCambio();
-      
+
     } catch (err) {
       console.error(err);
       toast.error(err.message);
@@ -211,7 +209,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
       await supabase.from('jugador_equipo').update({ activo: false }).eq('id', modalBaja.id)
       const hoy = new Date().toISOString().split('T')[0]
       await supabase.from('historial_clubes_jugador').update({ fecha_hasta: hoy }).eq('jugador_id', jugadorId).eq('equipo_id', modalBaja.equipo.id).is('fecha_hasta', null)
-      
+
       toast.success('Jugador dado de baja de esta nómina')
       setModalBaja(null)
       await cargarTodo()
@@ -230,7 +228,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
     <>
       <div onClick={onCerrar} className="fixed inset-0 bg-black/40 z-40" />
       <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-gray-50 shadow-2xl z-50 overflow-y-auto">
-        
+
         <div className="sticky top-0 bg-liga-azul text-white px-6 py-4 flex items-center justify-between z-10">
           <div>
             <h2 className="text-xl font-bold">Detalle del Jugador</h2>
@@ -245,7 +243,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
           <div className="p-12 text-center"><p className="text-gray-500">Jugador no encontrado</p></div>
         ) : (
           <div className="p-6 space-y-6">
-            
+
             {/* FOTO + NOMBRE */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center gap-4">
@@ -272,7 +270,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
                 <div><p className="text-gray-500 text-xs">Teléfono</p><p className="font-semibold">{jugador.telefono || '—'}</p></div>
                 <div className="col-span-2 pt-2 border-t border-gray-100 flex items-center justify-between">
                   <div>
-                    <p className="text-gray-500 text-xs">Consentimiento de Datos</p>
+                    <p className="text-gray-500 text-xs">Consentimiento de Datos (LOPDP)</p>
                     <p className={`font-semibold text-xs ${jugador.consentimiento_firmado ? 'text-green-600' : 'text-red-600'}`}>{jugador.consentimiento_firmado ? '✓ Aceptado' : '✕ Pendiente'}</p>
                   </div>
                   <button onClick={() => cambiarConsentimiento(!jugador.consentimiento_firmado)} disabled={guardando} className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${jugador.consentimiento_firmado ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-600 text-white'}`}>
@@ -464,7 +462,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
         )}
       </div>
 
-      {/* MODALES (Pago, Baja, Carnet) se mantienen igual */}
+      {/* MODAL: Pago de carnet */}
       {modalPago && (
         <>
           <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalPago(false)} />
@@ -483,6 +481,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
         </>
       )}
 
+      {/* MODAL: Dar de baja */}
       {modalBaja && (
         <>
           <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalBaja(null)} />
@@ -492,7 +491,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
                 <div className="bg-red-100 p-2 rounded-full"><AlertTriangle size={22} className="text-liga-rojo" /></div>
                 <h3 className="text-lg font-bold text-liga-rojo">Dar de baja del equipo</h3>
               </div>
-              <p className="text-sm text-gray-700 mb-4">¿Confirmas dar de baja a <strong>{jugador?.apellidos} {jugador?.nombres}</strong> del equipo <strong>{modalBaja.equipo.nombre} ({modalBaja.equipo.disciplina})</strong>?</p>
+              <p className="text-sm text-gray-700 mb-4">¿Confirmas dar de baja a <strong>{jugador?.apellidos} {jugador?.nombres}</strong> del equipo <strong>{modalBaja.equipo?.nombre} ({modalBaja.equipo?.disciplina})</strong>?</p>
               <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3 mb-4 text-xs text-yellow-800">El jugador seguirá activo en sus otras disciplinas. Esta acción solo inactiva esta inscripción.</div>
               <div className="flex gap-3">
                 <button onClick={() => setModalBaja(null)} disabled={guardando} className="flex-1 px-4 py-2 border border-gray-300 rounded-md font-semibold text-gray-700 hover:bg-gray-50">Cancelar</button>
@@ -503,6 +502,7 @@ export default function JugadorDetalleDrawer({ abierto, onCerrar, jugadorId, onE
         </>
       )}
 
+      {/* MODAL: Carnet Digital */}
       {modalCarnet && (
         <>
           <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalCarnet(false)} />

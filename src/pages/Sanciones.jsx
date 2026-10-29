@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 export default function Sanciones() {
   const { usuario } = useAuth()
   const [vista, setVista] = useState('sanciones_jugador') // 'sanciones_jugador' | 'sanciones_equipo' | 'deudas'
-  
+
   const [sancionesJugadores, setSancionesJugadores] = useState([])
   const [sancionesEquipos, setSancionesEquipos] = useState([])
   const [deudas, setDeudas] = useState([])
@@ -18,10 +18,10 @@ export default function Sanciones() {
   // === ESTADOS PARA CREAR SANCIONES ===
   const [modalSancionJugador, setModalSancionJugador] = useState(false)
   const [nuevaSancionJugador, setNuevaSancionJugador] = useState({ cedula: '', jugador: null, motivo: '', tipo: 'amarilla', fechas_sancion: 0 })
-  
+
   const [modalSancionEquipo, setModalSancionEquipo] = useState(false)
   const [nuevaSancionEquipo, setNuevaSancionEquipo] = useState({ equipo_id: '', motivo: '', tipo: 'economica', fechas_sancion: 0, descripcion: '', monto: '' })
-  
+
   const [equipos, setEquipos] = useState([])
   const [registrando, setRegistrando] = useState(false)
 
@@ -81,7 +81,7 @@ export default function Sanciones() {
   // === BUSCAR JUGADOR PARA SANCIONAR ===
   async function buscarJugadorSancion() {
     if (!nuevaSancionJugador.cedula.trim()) return toast.error('Ingresa una cédula')
-    
+
     const { data, error } = await supabase
       .from('jugadores')
       .select(`
@@ -93,7 +93,7 @@ export default function Sanciones() {
       .single()
 
     if (error || !data) return toast.error('Jugador no encontrado o inactivo')
-    
+
     const equipoActivo = data.inscripciones?.find(i => i.activo)?.equipo
     if (!equipoActivo) return toast.error('El jugador no tiene equipo activo')
 
@@ -119,7 +119,7 @@ export default function Sanciones() {
         fecha_inicio: new Date().toISOString()
       })
       if (error) throw error
-      
+
       toast.success('Sanción a jugador registrada')
       setModalSancionJugador(false)
       setNuevaSancionJugador({ cedula: '', jugador: null, motivo: '', tipo: 'amarilla', fechas_sancion: 0 })
@@ -146,7 +146,7 @@ export default function Sanciones() {
         registrado_por: usuario.id
       })
       if (error) throw error
-      
+
       toast.success('Sanción a equipo registrada')
       setModalSancionEquipo(false)
       setNuevaSancionEquipo({ equipo_id: '', motivo: '', tipo: 'economica', fechas_sancion: 0, descripcion: '', monto: '' })
@@ -374,16 +374,16 @@ export default function Sanciones() {
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Sanción</label>
-                    <select 
-                      value={nuevaSancionJugador.tipo} 
+                    <select
+                      value={nuevaSancionJugador.tipo}
                       onChange={e => {
                         const tipo = e.target.value;
                         setNuevaSancionJugador({
-                          ...nuevaSancionJugador, 
+                          ...nuevaSancionJugador,
                           tipo,
                           fechas_sancion: tipo === 'amarilla' ? 0 : nuevaSancionJugador.fechas_sancion
                         });
-                      }} 
+                      }}
                       className="w-full px-3 py-2 border rounded-md"
                     >
                       <option value="amarilla">Tarjeta Amarilla (Acumulativa)</option>
@@ -398,17 +398,17 @@ export default function Sanciones() {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Fechas de Sanción 
+                      Fechas de Sanción
                       {nuevaSancionJugador.tipo === 'amarilla' && <span className="text-xs text-orange-500 font-normal ml-1">(No suspende)</span>}
                     </label>
-                    <input 
-                      required 
-                      type="number" 
-                      min={nuevaSancionJugador.tipo === 'amarilla' ? 0 : 1} 
+                    <input
+                      required
+                      type="number"
+                      min={nuevaSancionJugador.tipo === 'amarilla' ? 0 : 1}
                       disabled={nuevaSancionJugador.tipo === 'amarilla'}
-                      value={nuevaSancionJugador.fechas_sancion} 
-                      onChange={e => setNuevaSancionJugador({...nuevaSancionJugador, fechas_sancion: e.target.value})} 
-                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100 disabled:text-gray-500" 
+                      value={nuevaSancionJugador.fechas_sancion}
+                      onChange={e => setNuevaSancionJugador({...nuevaSancionJugador, fechas_sancion: e.target.value})}
+                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100 disabled:text-gray-500"
                     />
                   </div>
                 </>

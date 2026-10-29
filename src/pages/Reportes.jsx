@@ -26,7 +26,7 @@ export default function Reportes() {
       const { data: deudasEq } = await supabase.from('deudas_equipo').select('monto, monto_pagado')
 
       const ingresosCarnets = (pagos || []).reduce((sum, p) => sum + Number(p.monto), 0)
-      
+
       const ingresosMultasJug = (deudasJug || []).reduce((sum, d) => sum + Number(d.monto_pagado), 0)
       const ingresosMultasEq = (deudasEq || []).reduce((sum, d) => sum + Number(d.monto_pagado), 0)
       const ingresosMultas = ingresosMultasJug + ingresosMultasEq
@@ -39,7 +39,7 @@ export default function Reportes() {
       const { count: partidosJugados } = await supabase.from('partidos').select('*', { count: 'exact', head: true }).eq('jugado', true)
       const { count: golesTotales } = await supabase.from('goles').select('*', { count: 'exact', head: true })
       const { count: totalEquipos } = await supabase.from('equipos').select('*', { count: 'exact', head: true }).eq('activo', true)
-      
+
       // 3. Cargar estado de jugadores
       const { data: jugadores } = await supabase.from('jugadores').select('id, calificado').eq('activo', true)
       const totalJugadores = (jugadores || []).length
@@ -85,7 +85,7 @@ export default function Reportes() {
           <h1 className="text-3xl font-bold text-liga-azul">Reportes y Estadísticas</h1>
           <p className="text-gray-500 mt-1">Resumen general de la liga en tiempo real</p>
         </div>
-        <button 
+        <button
           onClick={cargarReportes}
           className="text-sm bg-white text-liga-azul border border-liga-azul px-4 py-2 rounded-md font-semibold hover:bg-gray-50 transition-colors"
         >
@@ -98,7 +98,7 @@ export default function Reportes() {
         <DollarSign size={20} className="text-green-600" /> Resumen Financiero
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        
+
         {/* Ingresos Carnets */}
         <div className="bg-white rounded-lg shadow-md p-5 border-l-4 border-green-500">
           <div className="flex justify-between items-start">
@@ -144,7 +144,7 @@ export default function Reportes() {
         <Trophy size={20} className="text-yellow-500" /> Estadísticas del Torneo
       </h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        
+
         {/* Partidos Jugados */}
         <div className="bg-white rounded-lg shadow-md p-4 text-center">
           <div className="bg-indigo-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -188,7 +188,7 @@ export default function Reportes() {
       </h2>
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex flex-col md:flex-row items-center gap-6">
-          
+
           {/* Barra de progreso circular o lineal */}
           <div className="flex-1 w-full">
             <div className="flex justify-between text-sm font-semibold mb-2">
@@ -196,12 +196,12 @@ export default function Reportes() {
               <span className="text-red-600">No Calificados ({data.totalJugadores - data.jugadoresCalificados})</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden flex">
-              <div 
-                className="bg-green-500 h-4" 
+              <div
+                className="bg-green-500 h-4"
                 style={{ width: `${(data.jugadoresCalificados / data.totalJugadores) * 100 || 0}%` }}
               ></div>
-              <div 
-                className="bg-red-500 h-4" 
+              <div
+                className="bg-red-500 h-4"
                 style={{ width: `${((data.totalJugadores - data.jugadoresCalificados) / data.totalJugadores) * 100 || 0}%` }}
               ></div>
             </div>

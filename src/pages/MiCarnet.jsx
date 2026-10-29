@@ -28,7 +28,7 @@ export default function MiCarnet() {
           const { data: fallback } = await supabase
             .from('vista_carnet_jugador')
             .select('*')
-            .eq('cedula', '0502067739') 
+            .eq('cedula', '0502067739')
             .maybeSingle()
           data = fallback
         }
@@ -50,7 +50,7 @@ export default function MiCarnet() {
   }
 
   if (cargando) return <div className="min-h-screen flex items-center justify-center bg-liga-azul text-white"><Loader className="animate-spin" size={40} /></div>
-  
+
   if (error || !carnet) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-md text-center">
@@ -65,10 +65,10 @@ export default function MiCarnet() {
 
   return (
     <div className="min-h-screen bg-gray-200 flex flex-col items-center justify-center p-4 print:p-0 print:bg-white">
-      
+
       <div className="mb-6 print:hidden">
-        <button 
-          onClick={imprimirCarnet} 
+        <button
+          onClick={imprimirCarnet}
           className="bg-liga-azul text-white px-6 py-3 rounded-md font-bold text-lg hover:bg-liga-azul/90 flex items-center gap-2 shadow-lg"
         >
           <Printer size={22} /> Imprimir Carnet
@@ -77,7 +77,7 @@ export default function MiCarnet() {
 
       {/* CONTENEDOR DEL CARNET */}
       <div className="relative w-[600px] h-[400px] bg-blue-900 rounded-2xl shadow-2xl overflow-hidden print:shadow-none print:rounded-none">
-        
+
         {/* 1. IMAGEN DE FONDO */}
         <img src={carnetFondo} alt="Fondo Carnet" className="absolute inset-0 w-full h-full object-cover z-0" />
 
@@ -107,9 +107,9 @@ export default function MiCarnet() {
 
         {/* 4. CÓDIGO QR (Abajo a la Izquierda) */}
         <div className="absolute bottom-[10%] left-[4%] z-10 bg-white p-1 rounded shadow-sm">
-          <img 
-            src={qrUrl} 
-            alt="QR Verificación" 
+          <img
+            src={qrUrl}
+            alt="QR Verificación"
             className="w-[70px] h-[70px]"
           />
         </div>
@@ -124,7 +124,7 @@ export default function MiCarnet() {
             </div>
           )}
         </div>
-        
+
         {/* 6. SELLO DE LA LIGA */}
         <div className="absolute top-[5%] left-[3%] z-10 w-24 h-24 drop-shadow-lg">
           <img src={selloLiga} alt="Sello Liga" className="w-full h-full object-contain" />

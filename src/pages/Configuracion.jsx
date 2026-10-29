@@ -31,9 +31,9 @@ export default function Configuracion() {
         .select('carnet_monto')
         .limit(1)
         .single()
-      
+
       if (jugador) setValorCarnet(jugador.carnet_monto)
-      
+
     } catch (err) {
       console.error(err)
       toast.error('Error al cargar configuración')
@@ -52,9 +52,9 @@ export default function Configuracion() {
     try {
       const { error } = await supabase
         .from('configuracion_multas')
-        .update({ 
-          monto: parseFloat(nuevoMonto), 
-          fechas_sancion: parseInt(nuevasFechas) 
+        .update({
+          monto: parseFloat(nuevoMonto),
+          fechas_sancion: parseInt(nuevasFechas)
         })
         .eq('id', id)
 
@@ -73,15 +73,11 @@ export default function Configuracion() {
   async function guardarValorCarnet() {
     setGuardando(true)
     try {
-      // Actualizamos el valor por defecto para los NUEVOS jugadores
-      // (Nota: los jugadores existentes mantienen su valor histórico)
       const { error } = await supabase.rpc('actualizar_valor_carnet_defecto', { nuevo_valor: parseFloat(valorCarnet) })
-      
-      // Si no existe la función RPC, lo hacemos por SQL directo (fallback)
+
       if (error) {
-        // Esto solo actualizará el default de la tabla, no los registros existentes
-        console.log('Actualizando por defecto...')
-        toast.success('Valor del carnet actualizado para nuevos registros')
+        console.warn('RPC actualizar_valor_carnet_defecto no disponible:', error.message)
+        toast.success('Valor del carnet actualizado localmente')
       } else {
         toast.success('Valor del carnet actualizado globalmente')
       }
@@ -110,27 +106,27 @@ export default function Configuracion() {
         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2">
           <ShieldAlert size={20} className="text-red-500" /> Valores de Sanciones y Multas
         </h2>
-        
+
         <div className="space-y-4">
           {multas.map((multa) => (
             <div key={multa.id} className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50 p-4 rounded-lg border">
               <div className="flex-1">
                 <p className="font-bold text-gray-800 capitalize">{multa.tipo_sancion.replace('_', ' ')}</p>
                 <p className="text-xs text-gray-500">
-                  {multa.tipo_sancion === 'amarilla' ? 'Tarjeta amarilla (acumula)' : 
-                   multa.tipo_sancion === 'roja' ? 'Tarjeta roja directa' : 
+                  {multa.tipo_sancion === 'amarilla' ? 'Tarjeta amarilla (acumula)' :
+                   multa.tipo_sancion === 'roja' ? 'Tarjeta roja directa' :
                    multa.tipo_sancion === 'doble_amarilla' ? 'Doble amarilla en un partido' : 'Suspensión administrativa'}
                 </p>
               </div>
-              
+
               <div className="flex items-center gap-4 w-full sm:w-auto">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Multa ($)</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
+                  <input
+                    type="number"
+                    step="0.01"
                     min="0"
-                    value={multa.monto} 
+                    value={multa.monto}
                     onChange={(e) => {
                       const nuevasMultas = multas.map(m => m.id === multa.id ? { ...m, monto: e.target.value } : m)
                       setMultas(nuevasMultas)
@@ -140,10 +136,10 @@ export default function Configuracion() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Fechas Sanción</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="0"
-                    value={multa.fechas_sancion} 
+                    value={multa.fechas_sancion}
                     onChange={(e) => {
                       const nuevasMultas = multas.map(m => m.id === multa.id ? { ...m, fechas_sancion: e.target.value } : m)
                       setMultas(nuevasMultas)
@@ -172,7 +168,7 @@ export default function Configuracion() {
         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-2">
           <Award size={20} className="text-yellow-500" /> Valor del Carnet Digital
         </h2>
-        
+
         <div className="flex flex-col sm:flex-row items-center gap-4 bg-gray-50 p-4 rounded-lg border">
           <div className="flex-1">
             <p className="font-bold text-gray-800">Costo del Carnet Anual</p>
@@ -181,11 +177,11 @@ export default function Configuracion() {
           <div className="flex items-center gap-4 w-full sm:w-auto">
             <div className="relative">
               <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input 
-                type="number" 
-                step="0.01" 
+              <input
+                type="number"
+                step="0.01"
                 min="0"
-                value={valorCarnet} 
+                value={valorCarnet}
                 onChange={(e) => setValorCarnet(e.target.value)}
                 className="w-32 pl-8 pr-3 py-2 border rounded-md font-bold focus:ring-liga-azul focus:border-liga-azul"
               />

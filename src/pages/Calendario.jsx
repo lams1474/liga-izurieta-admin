@@ -26,7 +26,7 @@ export default function Calendario() {
   const [formEtapa, setFormEtapa] = useState({ nombre: '', disciplina: 'futbol', categoria: 'hombres', fecha_inicio: '', fecha_fin: '' })
   const [formFecha, setFormFecha] = useState({ numero: '', fecha_inicio: '', fecha_fin: '' })
   const [formPartido, setFormPartido] = useState({ hora: '', cancha: '', equipo_local_id: '', equipo_visitante_id: '', arbitro_id: '', vocal_id: '' })
-  
+
   const [partidoEditando, setPartidoEditando] = useState(null)
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function Calendario() {
       setArbitros(arb || [])
       setVocales(voc || [])
       setEtapas(et || [])
-      
+
       if (et && et.length > 0) setEtapaSeleccionada(et[0].id)
       setCargando(false)
     }

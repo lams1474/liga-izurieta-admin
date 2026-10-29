@@ -47,9 +47,9 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
   useEffect(() => {
     async function cargarEquipos() {
       if (!esAdmin && !esPresidente) return
-      
+
       const { data } = await supabase.from('equipos').select('id, nombre, disciplina, categoria').eq('activo', true).order('nombre')
-      
+
       let equiposFiltrados = data || []
 
       if (esPresidente && usuario) {
@@ -58,7 +58,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
           equiposFiltrados = data.filter(eq => eq.nombre === miEquipo.nombre)
         }
       }
-      
+
       setEquipos(equiposFiltrados)
     }
     cargarEquipos()
@@ -171,11 +171,17 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
       }
       if (!consentimiento) nuevosErrores.consentimiento = 'Debe autorizar el tratamiento'
     }
-    
+
     if (!jugadorEditar && (esAdmin || esPresidente) && !form.equipo_id) {
       nuevosErrores.equipo_id = 'Obligatorio'
     }
-    
+
+    if (form.tipo_pase && form.tipo_pase !== 'nuevo' && !form.club_anterior.trim()) nuevosErrores.club_anterior = 'Obligatorio'
+
+    if (!jugadorEditar && (esAdmin || esPresidente) && !form.equipo_id) {
+      nuevosErrores.equipo_id = 'Obligatorio'
+    }
+
     if (form.tipo_pase && form.tipo_pase !== 'nuevo' && !form.club_anterior.trim()) nuevosErrores.club_anterior = 'Obligatorio'
 
     setErrores(nuevosErrores)
@@ -402,7 +408,7 @@ export default function JugadorFormDrawer({ abierto, onCerrar, jugadorEditar, on
                       {esMenor ? 'Autorización del Tutor Legal' : 'Autorización del Jugador'}
                     </p>
                     <p className="text-gray-600 text-xs leading-relaxed">
-                      {esMenor 
+                      {esMenor
                         ? 'Declaro ser el tutor legal del jugador y AUTORIZO a la Liga Deportiva Barrial José Ignacio Izurieta a recopilar, almacenar y tratar los datos personales del menor (nombres, cédula, fecha de nacimiento, fotografía) con la finalidad exclusiva de gestionar su participación en el campeonato, cumpliendo con la Ley Orgánica de Protección de Datos Personales.'
                         : 'AUTORIZO a la Liga Deportiva Barrial José Ignacio Izurieta a recopilar, almacenar y tratar mis datos personales (nombres, cédula, fecha de nacimiento, fotografía) con la finalidad exclusiva de gestionar mi participación en el campeonato, cumpliendo con la Ley Orgánica de Protección de Datos Personales.'}
                     </p>

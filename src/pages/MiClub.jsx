@@ -140,7 +140,7 @@ export default function MiClub() {
       if (updateError) throw updateError
 
       toast.success('¡Escudo actualizado correctamente!')
-      
+
       // Recargar
       await cargarDatos()
       setPreviewEscudo(null)
