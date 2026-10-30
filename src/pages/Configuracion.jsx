@@ -16,26 +16,30 @@ export default function Configuracion() {
   async function cargarDatos() {
     setCargando(true)
     try {
-      // 1. Cargar multas
-      const { data: multasData } = await supabase
+      // 1. Cargar multas (Ajustado a las columnas reales)
+      const { data: multasData, error: errorMultas } = await supabase
         .from('configuracion_multas')
-        .select('*')
+        .select('id, tipo_sancion, monto, fechas_sancion')
         .eq('activo', true)
         .order('tipo_sancion')
 
+      if (errorMultas) throw errorMultas
       setMultas(multasData || [])
 
-      // 2. Cargar valor del carnet (lo tomamos de cualquier jugador o ponemos 1 por defecto)
-      const { data: jugador } = await supabase
+      // 2. Cargar valor del carnet (lo tomamos de cualquier jugador)
+      const { data: jugador, error: errorJugador } = await supabase
         .from('jugadores')
         .select('carnet_monto')
+        .not('carnet_monto', 'is', null)
         .limit(1)
-        .single()
+        .maybeSingle()
 
-      if (jugador) setValorCarnet(jugador.carnet_monto)
+      if (!errorJugador && jugador && jugador.carnet_monto) {
+        setValorCarnet(jugador.carnet_monto)
+      }
 
     } catch (err) {
-      console.error(err)
+      console.error("Error cargando configuración:", err)
       toast.error('Error al cargar configuración')
     } finally {
       setCargando(false)
@@ -54,7 +58,8 @@ export default function Configuracion() {
         .from('configuracion_multas')
         .update({
           monto: parseFloat(nuevoMonto),
-          fechas_sancion: parseInt(nuevasFechas)
+          fechas_sancion: parseInt(nuevasFechas),
+          actualizado_en: new Date().toISOString() // Actualizamos la fecha de modificación
         })
         .eq('id', id)
 
@@ -73,10 +78,11 @@ export default function Configuracion() {
   async function guardarValorCarnet() {
     setGuardando(true)
     try {
+      // Nota: Asegúrate de que este RPC exista en Supabase
       const { error } = await supabase.rpc('actualizar_valor_carnet_defecto', { nuevo_valor: parseFloat(valorCarnet) })
 
       if (error) {
-        console.warn('RPC actualizar_valor_carnet_defecto no disponible:', error.message)
+        console.warn('RPC no disponible:', error.message)
         toast.success('Valor del carnet actualizado localmente')
       } else {
         toast.success('Valor del carnet actualizado globalmente')
@@ -108,59 +114,62 @@ export default function Configuracion() {
         </h2>
 
         <div className="space-y-4">
-          {multas.map((multa) => (
-            <div key={multa.id} className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50 p-4 rounded-lg border">
-              <div className="flex-1">
-                <p className="font-bold text-gray-800 capitalize">{multa.tipo_sancion.replace('_', ' ')}</p>
-                <p className="text-xs text-gray-500">
-                  {multa.tipo_sancion === 'amarilla' ? 'Tarjeta amarilla (acumula)' :
-                   multa.tipo_sancion === 'roja' ? 'Tarjeta roja directa' :
-                   multa.tipo_sancion === 'doble_amarilla' ? 'Doble amarilla en un partido' : 'Suspensión administrativa'}
-                </p>
-              </div>
+          {multas.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-4">No hay multas configuradas.</p>
+          ) : (
+            multas.map((multa) => (
+              <div key={multa.id} className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50 p-4 rounded-lg border">
+                <div className="flex-1">
+                  <p className="font-bold text-gray-800 capitalize">
+                    {multa.tipo_sancion ? multa.tipo_sancion.replace('_', ' ') : 'Sin tipo'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {multa.tipo_sancion === 'amarilla' ? 'Tarjeta amarilla (acumula)' :
+                     multa.tipo_sancion === 'roja' ? 'Tarjeta roja directa' :
+                     multa.tipo_sancion === 'doble_amarilla' ? 'Doble amarilla en un partido' : 'Suspensión administrativa'}
+                  </p>
+                </div>
 
-              <div className="flex items-center gap-4 w-full sm:w-auto">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Multa ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={multa.monto}
-                    onChange={(e) => {
-                      const nuevasMultas = multas.map(m => m.id === multa.id ? { ...m, monto: e.target.value } : m)
-                      setMultas(nuevasMultas)
-                    }}
-                    className="w-24 px-3 py-2 border rounded-md focus:ring-liga-azul focus:border-liga-azul"
-                  />
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Multa ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={multa.monto || 0}
+                      onChange={(e) => {
+                        const nuevasMultas = multas.map(m => m.id === multa.id ? { ...m, monto: e.target.value } : m)
+                        setMultas(nuevasMultas)
+                      }}
+                      className="w-24 px-3 py-2 border rounded-md focus:ring-liga-azul focus:border-liga-azul"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Fechas Sanción</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={multa.fechas_sancion || 0}
+                      onChange={(e) => {
+                        const nuevasMultas = multas.map(m => m.id === multa.id ? { ...m, fechas_sancion: e.target.value } : m)
+                        setMultas(nuevasMultas)
+                      }}
+                      className="w-20 px-3 py-2 border rounded-md focus:ring-liga-azul focus:border-liga-azul"
+                    />
+                  </div>
+                  <button
+                    onClick={() => guardarMulta(multa.id, multa.monto, multa.fechas_sancion)}
+                    disabled={guardando}
+                    className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 disabled:opacity-50 flex items-center gap-2 mt-5"
+                  >
+                    <Save size={16} /> Guardar
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Fechas Sanción</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={multa.fechas_sancion}
-                    onChange={(e) => {
-                      const nuevasMultas = multas.map(m => m.id === multa.id ? { ...m, fechas_sancion: e.target.value } : m)
-                      setMultas(nuevasMultas)
-                    }}
-                    className="w-20 px-3 py-2 border rounded-md focus:ring-liga-azul focus:border-liga-azul"
-                  />
-                </div>
-                <button
-                  onClick={() => guardarMulta(multa.id, multa.monto, multa.fechas_sancion)}
-                  disabled={guardando}
-                  className="bg-liga-azul text-white px-4 py-2 rounded-md font-semibold hover:bg-liga-azul/90 disabled:opacity-50 flex items-center gap-2 mt-5"
-                >
-                  <Save size={16} /> Guardar
-                </button>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
-        <p className="text-xs text-gray-500 mt-4">
-          * Nota: El "suspension_admin" (por acumulación de 4 amarillas) no genera multa por defecto, solo fechas.
-        </p>
       </div>
 
       {/* SECCIÓN: CONFIGURACIÓN DEL CARNET */}
