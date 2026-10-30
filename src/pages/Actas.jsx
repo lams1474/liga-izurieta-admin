@@ -14,7 +14,6 @@ export default function Actas() {
 
   const esCapitan = usuario?.rol === 'capitan'
 
-  // Modal Ver Acta Completa
   const [actaSeleccionada, setActaSeleccionada] = useState(null)
   const [modalAbierto, setModalAbierto] = useState(false)
 
@@ -31,13 +30,11 @@ export default function Actas() {
             equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina, categoria),
             faltas:faltas_partido (
               id, tipo, minuto, 
-              jugador:jugadores (nombres, apellidos, dorsal), 
-              equipo:equipos (nombre)
+              jugador:jugadores (nombres, apellidos, dorsal)
             ),
             goles:goles (
               id, minuto, 
-              jugador:jugadores (nombres, apellidos), 
-              equipo:equipos (nombre)
+              jugador:jugadores (nombres, apellidos)
             )
           ),
           firmas:firmas_acta (firmante_tipo, firmado_en)
@@ -217,23 +214,6 @@ export default function Actas() {
                 </h4>
                 <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-700 font-sans leading-relaxed min-h-[70px]">
                   {actaSeleccionada.observaciones || 'Sin novedades registradas durante el partido.'}
-                </div>
-              </div>
-
-              {/* Firmas Digitales */}
-              <div className="grid grid-cols-2 gap-4 border-t pt-4 text-xs">
-                <div className="p-3 bg-gray-50 rounded-xl border text-center">
-                  <p className="font-semibold text-gray-500 uppercase">Firma Vocal / Turno</p>
-                  <p className={`font-bold mt-1 ${actaSeleccionada.firma_vocal ? 'text-green-600' : 'text-amber-600'}`}>
-                    {actaSeleccionada.firma_vocal ? '✓ Registrada / Firmado' : '⏳ Pendiente de Firma'}
-                  </p>
-                </div>
-
-                <div className="p-3 bg-gray-50 rounded-xl border text-center">
-                  <p className="font-semibold text-gray-500 uppercase">Firma Árbitro</p>
-                  <p className={`font-bold mt-1 ${actaSeleccionada.firma_arbitro ? 'text-green-600' : 'text-amber-600'}`}>
-                    {actaSeleccionada.firma_arbitro ? '✓ Registrada / Firmado' : '⏳ Pendiente de Firma'}
-                  </p>
                 </div>
               </div>
 
