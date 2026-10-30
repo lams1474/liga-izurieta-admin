@@ -30,7 +30,7 @@ export default function Actas() {
             equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina, categoria),
             faltas:faltas_partido (
               id, tipo, minuto, 
-              jugador:jugadores (nombres, apellidos, dorsal)
+              jugador:jugadores (nombres, apellidos)
             ),
             goles:goles (
               id, minuto, 
