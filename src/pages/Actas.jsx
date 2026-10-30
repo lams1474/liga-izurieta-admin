@@ -48,7 +48,7 @@ export default function Actas() {
       setActas(data || [])
     } catch (err) {
       console.error("Error cargando actas:", err)
-      toast.error('Error al cargar actas de partido')
+      toast.error(err.message || 'Error al cargar actas de partido')
     } finally {
       setCargando(false)
     }
