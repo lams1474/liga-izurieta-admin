@@ -25,7 +25,7 @@ export default function Actas() {
         .select(`
           id, estado, observaciones, cerrada_en,
           partido:partidos (
-            id, fecha_partido, hora_partido, lugar, goles_local, goles_visitante, estado,
+            id, fecha, hora, lugar, goles_local, goles_visitante, estado,
             equipo_local:equipos!partidos_equipo_local_id_fkey (id, nombre, disciplina, categoria),
             equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina, categoria),
             faltas:faltas_partido (
@@ -169,7 +169,7 @@ export default function Actas() {
                   <Calendar size={16} className="text-liga-azul" />
                   <div>
                     <p className="font-semibold text-gray-500 uppercase">Fecha y Hora</p>
-                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.fecha_partido || 'Sin fecha'} · {actaSeleccionada.partido?.hora_partido?.substring(0, 5) || '--:--'}</p>
+                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.fecha || 'Sin fecha'} · {actaSeleccionada.partido?.hora?.substring(0, 5) || '--:--'}</p>
                   </div>
                 </div>
 
