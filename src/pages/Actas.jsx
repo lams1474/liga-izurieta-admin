@@ -21,18 +21,24 @@ export default function Actas() {
   const cargarActas = useCallback(async () => {
     setCargando(true)
     try {
-      // MEJORA: Traemos los detalles de faltas, goles, arbitro y firmas
       const { data, error } = await supabase
         .from('actas')
         .select(`
           id, estado, observaciones, cerrada_en,
           partido:partidos (
-            id, fecha, hora, cancha, goles_local, goles_visitante, estado,
+            id, fecha_partido, hora_partido, lugar, goles_local, goles_visitante, estado,
             equipo_local:equipos!partidos_equipo_local_id_fkey (id, nombre, disciplina, categoria),
             equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina, categoria),
-            arbitro:arbitros (nombres, apellidos),
-            faltas:faltas_partido (id, tipo, minuto, jugador:jugadores (nombres, apellidos, dorsal), equipo:equipos (nombre)),
-            goles:goles (id, minuto, jugador:jugadores (nombres, apellidos), equipo:equipos (nombre))
+            faltas:faltas_partido (
+              id, tipo, minuto, 
+              jugador:jugadores (nombres, apellidos, dorsal), 
+              equipo:equipos (nombre)
+            ),
+            goles:goles (
+              id, minuto, 
+              jugador:jugadores (nombres, apellidos), 
+              equipo:equipos (nombre)
+            )
           ),
           firmas:firmas_acta (firmante_tipo, firmado_en)
         `)
@@ -41,7 +47,7 @@ export default function Actas() {
       if (error) throw error
       setActas(data || [])
     } catch (err) {
-      console.error(err)
+      console.error("Error cargando actas:", err)
       toast.error('Error al cargar actas de partido')
     } finally {
       setCargando(false)
@@ -166,7 +172,7 @@ export default function Actas() {
                   <Calendar size={16} className="text-liga-azul" />
                   <div>
                     <p className="font-semibold text-gray-500 uppercase">Fecha y Hora</p>
-                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.fecha || 'Sin fecha'} · {actaSeleccionada.partido?.hora?.substring(0, 5) || '--:--'}</p>
+                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.fecha_partido || 'Sin fecha'} · {actaSeleccionada.partido?.hora_partido?.substring(0, 5) || '--:--'}</p>
                   </div>
                 </div>
 
@@ -174,7 +180,7 @@ export default function Actas() {
                   <MapPin size={16} className="text-liga-azul" />
                   <div>
                     <p className="font-semibold text-gray-500 uppercase">Lugar / Cancha</p>
-                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.cancha || 'Cancha Oficial'}</p>
+                    <p className="font-bold text-gray-900">{actaSeleccionada.partido?.lugar || 'Cancha Oficial'}</p>
                   </div>
                 </div>
 
@@ -218,15 +224,15 @@ export default function Actas() {
               <div className="grid grid-cols-2 gap-4 border-t pt-4 text-xs">
                 <div className="p-3 bg-gray-50 rounded-xl border text-center">
                   <p className="font-semibold text-gray-500 uppercase">Firma Vocal / Turno</p>
-                  <p className={`font-bold mt-1 ${actaSeleccionada.firmado_vocal ? 'text-green-600' : 'text-amber-600'}`}>
-                    {actaSeleccionada.firmado_vocal ? '✓ Registrada / Firmado' : '⏳ Pendiente de Firma'}
+                  <p className={`font-bold mt-1 ${actaSeleccionada.firma_vocal ? 'text-green-600' : 'text-amber-600'}`}>
+                    {actaSeleccionada.firma_vocal ? '✓ Registrada / Firmado' : '⏳ Pendiente de Firma'}
                   </p>
                 </div>
 
                 <div className="p-3 bg-gray-50 rounded-xl border text-center">
                   <p className="font-semibold text-gray-500 uppercase">Firma Árbitro</p>
-                  <p className={`font-bold mt-1 ${actaSeleccionada.firmado_arbitro ? 'text-green-600' : 'text-amber-600'}`}>
-                    {actaSeleccionada.firmado_arbitro ? '✓ Registrada / Firmado' : '⏳ Pendiente de Firma'}
+                  <p className={`font-bold mt-1 ${actaSeleccionada.firma_arbitro ? 'text-green-600' : 'text-amber-600'}`}>
+                    {actaSeleccionada.firma_arbitro ? '✓ Registrada / Firmado' : '⏳ Pendiente de Firma'}
                   </p>
                 </div>
               </div>
