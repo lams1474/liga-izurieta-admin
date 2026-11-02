@@ -25,7 +25,7 @@ export default function Actas() {
                 .select(`
           id, estado, observaciones, cerrada_en,
           partido:partidos (
-            id, hora, cancha, goles_local, goles_visitante, estado,
+            id, hora, cancha, goles_local, goles_visitante,
             fecha:fechas (fecha_inicio),
             equipo_local:equipos!partidos_equipo_local_id_fkey (id, nombre, disciplina, categoria),
             equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina, categoria),
