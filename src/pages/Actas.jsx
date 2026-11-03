@@ -40,7 +40,7 @@ export default function Actas() {
               jugador:jugadores (id, nombres, apellidos)
             ),
             goles:goles (
-              id, minuto, equipo_id,
+              id, minuto,
               jugador:jugadores (id, nombres, apellidos)
             )
           ),
