@@ -4,6 +4,8 @@ import { FileCheck, CheckCircle2, Clock, Lock, Eye, X, Calendar, MapPin, UserChe
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export default function Actas() {
   const { usuario } = useAuth()
@@ -22,7 +24,7 @@ export default function Actas() {
     try {
       const { data, error } = await supabase
         .from('actas')
-                .select(`
+        .select(`
           id, estado, observaciones, cerrada_en,
           partido:partidos (
             id, hora, cancha, goles_local, goles_visitante,
@@ -63,6 +65,79 @@ export default function Actas() {
       return a.estado === 'cerrada'
     }
   })
+
+  function descargarPDF(acta) {
+    try {
+      const doc = new jsPDF()
+      const p = acta.partido
+      const sanitize = (s) => s ? String(s).trim() : ''
+
+      const dibujarEncabezado = (pagina) => {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(14)
+        doc.text('LIGA DEPORTIVA BARRIAL JOSE I. IZURIETA', 105, 15, { align: 'center' })
+        doc.setFontSize(9); doc.setFont("helvetica", "normal")
+        doc.text('PUJILI - ECUADOR', 105, 20, { align: 'center' })
+        doc.text('FUNDADA EL 09 DE MARZO DEL 2013', 20, 26)
+        doc.text('ACUERDO MUNICIPAL NO. 034-GADMP-2013', 130, 26)
+        doc.line(15, 28, 195, 28)
+        doc.setFont("helvetica", "bold"); doc.setFontSize(12)
+        doc.text(`ACTA DE JUEGO - PAGINA ${pagina}`, 105, 35, { align: 'center' })
+      }
+
+      dibujarEncabezado(1)
+      doc.setFontSize(9); doc.setFont("helvetica", "normal")
+      
+      const fechaStr = p.fecha?.fecha_inicio ? new Date(p.fecha.fecha_inicio + 'T00:00:00').toLocaleDateString('es-EC') : '--/--/----'
+      doc.text(`VOCAL DE TURNO: ____________________`, 15, 45)
+      doc.text(`CIUDAD: Pujili`, 100, 45)
+      doc.text(`FECHA: ${fechaStr}`, 145, 45)
+      doc.text(`HORA: ${p.hora?.slice(0,5) || '________'}`, 15, 51)
+
+      doc.setFont("helvetica", "bold")
+      doc.text(`CLUB: ${sanitize(p.equipo_local?.nombre?.toUpperCase())}`, 15, 60)
+      doc.text(`CATEGORIA: ${sanitize(p.equipo_local?.categoria?.toUpperCase())}`, 100, 60)
+
+      autoTable(doc, {
+        startY: 63, head: [['MIN', 'JUGADOR', 'EVENTO']], 
+        body: p.goles.map(g => [g.minuto, `${g.jugador?.apellidos} ${g.jugador?.nombres}`, 'GOL']),
+        theme: 'grid', headStyles: { fillColor: [200,200,200], textColor: [0,0,0] }
+      })
+
+      let finalY = doc.lastAutoTable.finalY + 10
+      doc.setFont("helvetica", "bold")
+      doc.text(`CLUB: ${sanitize(p.equipo_visitante?.nombre?.toUpperCase())}`, 15, finalY)
+      
+      autoTable(doc, {
+        startY: finalY + 3, head: [['MIN', 'JUGADOR', 'EVENTO']], 
+        body: p.faltas.map(f => [f.minuto, `${f.jugador?.apellidos} ${f.jugador?.nombres}`, f.tipo.toUpperCase()]),
+        theme: 'grid', headStyles: { fillColor: [200,200,200], textColor: [0,0,0] }
+      })
+
+      doc.addPage(); dibujarEncabezado(2); doc.setFontSize(9); doc.setFont("helvetica", "normal")
+      
+      doc.setFont("helvetica", "bold"); doc.text('NOVEDADES:', 15, 45); doc.setFont("helvetica", "normal")
+      const splitText = doc.splitTextToSize(sanitize(acta.observaciones || 'Sin novedades.'), 175)
+      doc.text(splitText, 15, 51)
+
+      let lineY = 51 + (splitText.length * 5) + 10
+      const firmaY = lineY + 110 + 85 
+
+      const xPositions = [15, 65, 115, 165]
+      const firmantes = ['CAPITÁN LOCAL', 'CAPITÁN VISITANTE', 'ÁRBITRO', 'VOCAL']
+
+      firmantes.forEach((item, index) => {
+        const x = xPositions[index]
+        doc.line(x, firmaY, x + 30, firmaY)
+        doc.setFontSize(7); doc.setFont("helvetica", "bold")
+        doc.text(item, x + 15, firmaY + 4, { align: 'center' })
+      })
+
+      doc.save(`acta-${p.equipo_local?.nombre}-vs-${p.equipo_visitante?.nombre}.pdf`)
+    } catch (err) { 
+      console.error('Error generando PDF:', err)
+      toast.error('Error al generar el acta PDF') 
+    }
+  }
 
   if (cargando) return <div className="p-8 text-center text-gray-500">Cargando actas...</div>
 
@@ -145,7 +220,6 @@ export default function Actas() {
         )}
       </div>
 
-      {/* MODAL: Ver Acta Completa Sincronizada */}
       {modalAbierto && actaSeleccionada && (
         <>
           <div className="fixed inset-0 bg-black/60 z-[60]" onClick={() => setModalAbierto(false)} />
@@ -164,7 +238,6 @@ export default function Actas() {
                 </button>
               </div>
 
-              {/* Datos del Encuentro */}
               <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-gray-700">
                 <div className="flex items-center gap-2">
                   <Calendar size={16} className="text-liga-azul" />
@@ -191,7 +264,6 @@ export default function Actas() {
                 </div>
               </div>
 
-              {/* Resultado del Partido */}
               <div className="bg-gray-900 text-white rounded-xl p-5 flex items-center justify-between text-center">
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-gray-400 uppercase">Local</p>
@@ -208,7 +280,6 @@ export default function Actas() {
                 </div>
               </div>
 
-              {/* Novedades y Observaciones de Vocalía */}
               <div className="space-y-2">
                 <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                   <UserCheck size={18} className="text-liga-azul" /> Novedades y Observaciones del Vocal
@@ -218,7 +289,13 @@ export default function Actas() {
                 </div>
               </div>
 
-              <div className="flex justify-end border-t pt-4">
+              <div className="flex justify-between items-center border-t pt-4">
+                <button
+                  onClick={() => descargarPDF(actaSeleccionada)}
+                  className="px-5 py-2 bg-liga-verde text-white rounded-lg text-sm font-semibold hover:bg-green-700 flex items-center gap-2"
+                >
+                  <FileText size={16} /> Descargar PDF Oficial
+                </button>
                 <button
                   onClick={() => setModalAbierto(false)}
                   className="px-5 py-2 bg-liga-azul text-white rounded-lg text-sm font-semibold hover:bg-blue-800"
