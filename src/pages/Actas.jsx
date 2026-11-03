@@ -44,7 +44,7 @@ export default function Actas() {
               jugador:jugadores (id, nombres, apellidos)
             )
           ),
-          firmas:firmas_acta (firmante_tipo, firma_base64)
+          firmas:firmas_acta (firmante_tipo, firma_digital)
         `)
         .order('creado_en', { ascending: false })
 
@@ -199,7 +199,7 @@ export default function Actas() {
 
       firmantes.forEach((item, index) => {
         const x = xPositions[index]
-        drawImageSafely(item.firma?.firma_base64, x, firmaY - 20, 30, 15)
+        drawImageSafely(item.firma?.firma_digital, x, firmaY - 20, 30, 15)
         doc.line(x, firmaY, x + 30, firmaY)
         doc.setFontSize(7); doc.setFont("helvetica", "bold")
         doc.text(item.nombre, x + 15, firmaY + 4, { align: 'center' })
