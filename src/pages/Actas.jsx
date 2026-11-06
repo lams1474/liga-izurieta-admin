@@ -33,7 +33,7 @@ export default function Actas() {
             fecha:fechas (fecha_inicio),
             equipo_local:equipos!partidos_equipo_local_id_fkey (id, nombre, disciplina, categoria),
             equipo_visitante:equipos!partidos_equipo_visitante_id_fkey (id, nombre, disciplina, categoria),
-            planilla:planilla_partido (
+            planilla:planilla_partido!partido_id (
               equipo_id, dorsal, es_titular, es_capitan,
               jugador:jugadores (id, nombres, apellidos)
             ),
