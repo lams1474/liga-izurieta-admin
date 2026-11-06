@@ -51,23 +51,8 @@ export default function Actas() {
         .order('creado_en', { ascending: false })
 
       if (error) throw error
-      
-      // Obtener nombres de vocal y arbitro
-      const actasConNombres = await Promise.all((data || []).map(async (acta) => {
-        let nombreVocal = '____________________'
-        let nombreArbitro = '____________________'
-        if (acta.partido?.vocal_id) {
-          const { data: v } = await supabase.from('usuarios').select('nombres, apellidos').eq('id', acta.partido.vocal_id).single()
-          if (v) nombreVocal = `${v.nombres} ${v.apellidos}`
-        }
-        if (acta.partido?.arbitro_id) {
-          const { data: a } = await supabase.from('arbitros').select('nombres, apellidos').eq('id', acta.partido.arbitro_id).single()
-          if (a) nombreArbitro = `${a.nombres} ${a.apellidos}`
-        }
-        return { ...acta, nombreVocal, nombreArbitro }
-      }))
 
-      setActas(actasConNombres)
+      setActas(data || [])
     } catch (err) {
       console.error("Error cargando actas:", err)
       toast.error(err.message || 'Error al cargar actas de partido')
@@ -92,22 +77,10 @@ export default function Actas() {
     try {
       const doc = new jsPDF()
       const p = acta.partido
-      console.log("Datos del acta:", acta);
-      console.log("Firmas:", acta.firmas);
-      console.log("Planilla:", acta.partido?.planilla);
-      console.log("Faltas:", acta.partido?.faltas);
-      console.log("Goles:", acta.partido?.goles);
       
-      // Limpiador profundo para evitar los símbolos raros (...)
       const sanitize = (s) => {
         if (!s) return '';
-        return String(s)
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/ñ/g, 'n')
-          .replace(/Ñ/g, 'N')
-          .replace(/[^\x20-\x7E]/g, "") // Solo permite caracteres ASCII imprimibles
-          .trim();
+        return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ñ/g, 'n').replace(/Ñ/g, 'N').replace(/[^\x20-\x7E]/g, "").trim();
       }
 
       const dibujarEncabezado = (pagina) => {
@@ -140,17 +113,17 @@ export default function Actas() {
       const faltas = Array.isArray(p.faltas) ? p.faltas : (p.faltas ? [p.faltas] : [])
       const goles = Array.isArray(p.goles) ? p.goles : (p.goles ? [p.goles] : [])
 
-      // TABLA LOCAL
+      // TABLA LOCAL (Solo los que tienen dorsal > 0)
       doc.setFont("helvetica", "bold")
       doc.text(`CLUB: ${sanitize(p.equipo_local?.nombre?.toUpperCase())}`, 15, 60)
       doc.text(`CATEGORIA: ${sanitize(p.equipo_local?.categoria?.toUpperCase())}`, 100, 60)
 
-      const jugadoresLocales = planilla.filter(pl => pl.equipo_id === p.equipo_local?.id)
+      const jugadoresLocales = planilla.filter(pl => pl.equipo_id === p.equipo_local?.id && pl.dorsal > 0)
       const filasLocal = jugadoresLocales.map(j => {
         const g = goles.filter(x => x.jugador?.id === j.jugador?.id).length
         const a = faltas.filter(x => x.jugador?.id === j.jugador?.id && x.tipo === 'amarilla').length
         const r = faltas.filter(x => x.jugador?.id === j.jugador?.id && x.tipo === 'roja').length
-        return [j.dorsal || '-', sanitize(`${j.jugador?.apellidos} ${j.jugador?.nombres}`), g > 0 ? g : '', a > 0 ? 'X' : '', r > 0 ? 'X' : '']
+        return [j.dorsal, sanitize(`${j.jugador?.apellidos} ${j.jugador?.nombres}`), g > 0 ? g : '', a > 0 ? 'X' : '', r > 0 ? 'X' : '']
       })
 
       autoTable(doc, {
@@ -160,18 +133,18 @@ export default function Actas() {
         columnStyles: { 0:{cellWidth:15,halign:'center'}, 1:{cellWidth:110}, 2:{cellWidth:15,halign:'center'}, 3:{cellWidth:15,halign:'center'}, 4:{cellWidth:15,halign:'center'} }
       })
 
-      // TABLA VISITANTE
+      // TABLA VISITANTE (Solo los que tienen dorsal > 0)
       let finalY = doc.lastAutoTable.finalY + 10
       doc.setFont("helvetica", "bold")
       doc.text(`CLUB: ${sanitize(p.equipo_visitante?.nombre?.toUpperCase())}`, 15, finalY)
       doc.text(`CATEGORIA: ${sanitize(p.equipo_visitante?.categoria?.toUpperCase())}`, 100, finalY)
 
-      const jugadoresVisitantes = planilla.filter(pl => pl.equipo_id === p.equipo_visitante?.id)
+      const jugadoresVisitantes = planilla.filter(pl => pl.equipo_id === p.equipo_visitante?.id && pl.dorsal > 0)
       const filasVisitante = jugadoresVisitantes.map(j => {
         const g = goles.filter(x => x.jugador?.id === j.jugador?.id).length
         const a = faltas.filter(x => x.jugador?.id === j.jugador?.id && x.tipo === 'amarilla').length
         const r = faltas.filter(x => x.jugador?.id === j.jugador?.id && x.tipo === 'roja').length
-        return [j.dorsal || '-', sanitize(`${j.jugador?.apellidos} ${j.jugador?.nombres}`), g > 0 ? g : '', a > 0 ? 'X' : '', r > 0 ? 'X' : '']
+        return [j.dorsal, sanitize(`${j.jugador?.apellidos} ${j.jugador?.nombres}`), g > 0 ? g : '', a > 0 ? 'X' : '', r > 0 ? 'X' : '']
       })
 
       autoTable(doc, {
@@ -181,14 +154,14 @@ export default function Actas() {
         columnStyles: { 0:{cellWidth:15,halign:'center'}, 1:{cellWidth:110}, 2:{cellWidth:15,halign:'center'}, 3:{cellWidth:15,halign:'center'}, 4:{cellWidth:15,halign:'center'} }
       })
 
-      // PAGINA 2 (Tarjetas y Firmas)
+      // PAGINA 2
       doc.addPage(); dibujarEncabezado(2); doc.setFontSize(9); doc.setFont("helvetica", "normal")
       
       let nextY = 45
       const tarjetasLocal = faltas.filter(f => f.equipo_id === p.equipo_local?.id && (f.tipo === 'amarilla' || f.tipo === 'roja'))
       const tarjetasVisitante = faltas.filter(f => f.equipo_id === p.equipo_visitante?.id && (f.tipo === 'amarilla' || f.tipo === 'roja'))
 
-            const dibujarTarjetas = (startY, nombreClub, tarjetas) => {
+      const dibujarTarjetas = (startY, nombreClub, tarjetas) => {
         doc.setFont("helvetica", "bold")
         doc.text(`TARJETAS DEL CLUB: ${sanitize(nombreClub?.toUpperCase())}`, 15, startY)
         let y = startY + 6
@@ -198,10 +171,8 @@ export default function Actas() {
            return y + 10
         }
         tarjetas.forEach((t, i) => {
-           // Buscamos el nombre del jugador directamente en el objeto que trae la tarjeta
            const jugadorNombre = t.jugador ? `${t.jugador.apellidos} ${t.jugador.nombres}` : 'Desconocido'
-           // Buscamos el dorsal en la planilla
-           const dorsal = p.planilla?.find(pl => pl.jugador?.id === t.jugador?.id)?.dorsal || '-'
+           const dorsal = planilla.find(pl => pl.jugador?.id === t.jugador?.id)?.dorsal || '-'
            doc.text(`MIN ${t.minuto || 0}: ${sanitize(jugadorNombre)} (${t.tipo.toUpperCase()}) - DORSAL ${dorsal}`, 15, y + (i*6))
         })
         return y + (tarjetas.length * 6) + 10
@@ -218,6 +189,8 @@ export default function Actas() {
       const firmaY = lineY + 85 
 
       const firmas = Array.isArray(acta.firmas) ? acta.firmas : (acta.firmas ? [acta.firmas] : [])
+      
+      // CORRECCIÓN: Buscar firmas con los tipos correctos que manda la PWA
       const fArbitro = firmas.find(f => f.firmante_tipo === 'arbitro')
       const fCapLocal = firmas.find(f => f.firmante_tipo === 'capitan_local')
       const fCapVisitante = firmas.find(f => f.firmante_tipo === 'capitan_visitante')
