@@ -92,6 +92,11 @@ export default function Actas() {
     try {
       const doc = new jsPDF()
       const p = acta.partido
+      console.log("Datos del acta:", acta);
+      console.log("Firmas:", acta.firmas);
+      console.log("Planilla:", acta.partido?.planilla);
+      console.log("Faltas:", acta.partido?.faltas);
+      console.log("Goles:", acta.partido?.goles);
       
       // Limpiador profundo para evitar los símbolos raros (...)
       const sanitize = (s) => {
