@@ -106,7 +106,7 @@ export default function Actas() {
           .replace(/[\u0300-\u036f]/g, "")
           .replace(/ñ/g, 'n')
           .replace(/Ñ/g, 'N')
-          .replace(/[^\u0000-\u007F]/g, "") // Elimina cualquier caracter no ASCII
+          .replace(/[^\x20-\x7E]/g, "") // Solo permite caracteres ASCII imprimibles
           .trim();
       }
 
@@ -197,12 +197,10 @@ export default function Actas() {
            doc.text('Sin tarjetas registradas.', 15, y)
            return y + 10
         }
-        tarjetas.forEach((t, i) => {
-           // Buscamos el dorsal del jugador en la planilla de su equipo
-           const jugadorEnPlanilla = planilla.find(pl => pl.jugador?.id === t.jugador?.id)
-           const dorsal = jugadorEnPlanilla ? jugadorEnPlanilla.dorsal : '-'
-           
-           doc.text(`MIN ${t.minuto || 0}: ${sanitize(t.jugador?.apellidos)} ${sanitize(t.jugador?.nombres)} (${t.tipo.toUpperCase()}) - DORSAL ${dorsal}`, 15, y + (i*6))
+          tarjetas.forEach((t, i) => {
+          const jug = t.jugador // El Admin ya trae el objeto jugador en la consulta
+          const dorsal = p.planilla?.find(pl => pl.jugador?.id === jug?.id)?.dorsal || '-'
+          doc.text(`MIN ${t.minuto || 0}: ${sanitize(jug?.apellidos)} ${sanitize(jug?.nombres)} (${t.tipo.toUpperCase()}) - DORSAL ${dorsal}`, 15, y + (i*6))
         })
         return y + (tarjetas.length * 6) + 10
       }
@@ -218,9 +216,9 @@ export default function Actas() {
       const firmaY = lineY + 85 
 
       const firmas = Array.isArray(acta.firmas) ? acta.firmas : (acta.firmas ? [acta.firmas] : [])
-      const fArbitro = firmas.find(f => f.firmante_tipo === 'arbitro')
-      const fCapLocal = firmas.find(f => f.firmante_tipo === 'local')
-      const fCapVisitante = firmas.find(f => f.firmante_tipo === 'visitante')
+            const fArbitro = firmas.find(f => f.firmante_tipo === 'arbitro')
+      const fCapLocal = firmas.find(f => f.firmante_tipo === 'capitan_local')
+      const fCapVisitante = firmas.find(f => f.firmante_tipo === 'capitan_visitante')
       const fVocal = firmas.find(f => f.firmante_tipo === 'vocal')
 
       const capLocalPlan = planilla.find(pl => pl.es_capitan && pl.equipo_id === p.equipo_local?.id)
