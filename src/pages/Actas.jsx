@@ -188,7 +188,7 @@ export default function Actas() {
       const tarjetasLocal = faltas.filter(f => f.equipo_id === p.equipo_local?.id && (f.tipo === 'amarilla' || f.tipo === 'roja'))
       const tarjetasVisitante = faltas.filter(f => f.equipo_id === p.equipo_visitante?.id && (f.tipo === 'amarilla' || f.tipo === 'roja'))
 
-      const dibujarTarjetas = (startY, nombreClub, tarjetas) => {
+            const dibujarTarjetas = (startY, nombreClub, tarjetas) => {
         doc.setFont("helvetica", "bold")
         doc.text(`TARJETAS DEL CLUB: ${sanitize(nombreClub?.toUpperCase())}`, 15, startY)
         let y = startY + 6
@@ -197,10 +197,12 @@ export default function Actas() {
            doc.text('Sin tarjetas registradas.', 15, y)
            return y + 10
         }
-          tarjetas.forEach((t, i) => {
-          const jug = t.jugador // El Admin ya trae el objeto jugador en la consulta
-          const dorsal = p.planilla?.find(pl => pl.jugador?.id === jug?.id)?.dorsal || '-'
-          doc.text(`MIN ${t.minuto || 0}: ${sanitize(jug?.apellidos)} ${sanitize(jug?.nombres)} (${t.tipo.toUpperCase()}) - DORSAL ${dorsal}`, 15, y + (i*6))
+        tarjetas.forEach((t, i) => {
+           // Buscamos el nombre del jugador directamente en el objeto que trae la tarjeta
+           const jugadorNombre = t.jugador ? `${t.jugador.apellidos} ${t.jugador.nombres}` : 'Desconocido'
+           // Buscamos el dorsal en la planilla
+           const dorsal = p.planilla?.find(pl => pl.jugador?.id === t.jugador?.id)?.dorsal || '-'
+           doc.text(`MIN ${t.minuto || 0}: ${sanitize(jugadorNombre)} (${t.tipo.toUpperCase()}) - DORSAL ${dorsal}`, 15, y + (i*6))
         })
         return y + (tarjetas.length * 6) + 10
       }
@@ -216,7 +218,7 @@ export default function Actas() {
       const firmaY = lineY + 85 
 
       const firmas = Array.isArray(acta.firmas) ? acta.firmas : (acta.firmas ? [acta.firmas] : [])
-            const fArbitro = firmas.find(f => f.firmante_tipo === 'arbitro')
+      const fArbitro = firmas.find(f => f.firmante_tipo === 'arbitro')
       const fCapLocal = firmas.find(f => f.firmante_tipo === 'capitan_local')
       const fCapVisitante = firmas.find(f => f.firmante_tipo === 'capitan_visitante')
       const fVocal = firmas.find(f => f.firmante_tipo === 'vocal')
