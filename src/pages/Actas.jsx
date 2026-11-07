@@ -118,7 +118,7 @@ export default function Actas() {
       doc.text(`CLUB: ${sanitize(p.equipo_local?.nombre?.toUpperCase())}`, 15, 60)
       doc.text(`CATEGORIA: ${sanitize(p.equipo_local?.categoria?.toUpperCase())}`, 100, 60)
 
-      const jugadoresLocales = planilla.filter(pl => pl.equipo_id === p.equipo_local?.id)
+      const jugadoresLocales = planilla.filter(pl => pl.equipo_id === p.equipo_local?.id && (pl.es_titular || pl.es_capitan))
       const filasLocal = jugadoresLocales.map(j => {
         const g = goles.filter(x => x.jugador?.id === j.jugador?.id).length
         const a = faltas.filter(x => x.jugador?.id === j.jugador?.id && x.tipo === 'amarilla').length
@@ -139,7 +139,7 @@ export default function Actas() {
       doc.text(`CLUB: ${sanitize(p.equipo_visitante?.nombre?.toUpperCase())}`, 15, finalY)
       doc.text(`CATEGORIA: ${sanitize(p.equipo_visitante?.categoria?.toUpperCase())}`, 100, finalY)
 
-      const jugadoresVisitantes = planilla.filter(pl => pl.equipo_id === p.equipo_visitante?.id)
+      const jugadoresVisitantes = planilla.filter(pl => pl.equipo_id === p.equipo_visitante?.id && (pl.es_titular || pl.es_capitan))
       const filasVisitante = jugadoresVisitantes.map(j => {
         const g = goles.filter(x => x.jugador?.id === j.jugador?.id).length
         const a = faltas.filter(x => x.jugador?.id === j.jugador?.id && x.tipo === 'amarilla').length
