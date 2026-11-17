@@ -38,7 +38,7 @@ export default function Actas() {
               jugador:jugadores (id, nombres, apellidos)
             ),
             faltas:faltas_partido (
-              id, tipo, minuto, equipo_id,
+              id, tipo, minuto, equipo_id, causa,
               jugador:jugadores (id, nombres, apellidos)
             ),
             goles:goles (
@@ -170,10 +170,10 @@ export default function Actas() {
            doc.text('Sin tarjetas registradas.', 15, y)
            return y + 10
         }
-                tarjetas.forEach((t, i) => {
+        tarjetas.forEach((t, i) => {
            const jugadorNombre = t.jugador ? `${t.jugador.apellidos} ${t.jugador.nombres}` : 'Desconocido'
            const dorsal = planilla.find(pl => pl.jugador?.id === t.jugador?.id)?.dorsal || '-'
-           // AGREGAMOS LA CAUSA AL FINAL
+           // AGREGAMOS LA CAUSA AL FINAL:
            doc.text(`MIN ${t.minuto || 0}: ${sanitize(jugadorNombre)} (${t.tipo.toUpperCase()}) - DORSAL ${dorsal} - CAUSA: ${sanitize(t.causa || 'No especificada')}`, 15, y + (i*6))
         })
         return y + (tarjetas.length * 6) + 10
