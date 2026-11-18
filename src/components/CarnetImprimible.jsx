@@ -24,7 +24,7 @@ export default function CarnetImprimible({ jugador }) {
 
       {/* Datos (escalados proporcionalmente) */}
       <div className="absolute top-[26%] left-[27%] right-[15%] z-10 bg-black/30 backdrop-blur-sm p-1 rounded-r-lg border-l-2 border-liga-amarillo shadow-lg">
-        <h3 className="text-white font-bold text-[10px] leading-tight mb-0.5 truncate">
+        <h3 className="text-white font-bold text-[9px] leading-[1.1] mb-0.5 break-words" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {jugador.apellidos} {jugador.nombres}
         </h3>
         <p className="text-white text-[8px] font-mono mb-0.5">C.C. {jugador.cedula}</p>
