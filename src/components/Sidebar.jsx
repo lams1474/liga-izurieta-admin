@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Users, Building2, DollarSign, Calendar, AlertTriangle,
   FileText, BarChart3, UserCog, QrCode, Menu, X,
-  ShieldCheck, BookUser, Settings
+  ShieldCheck, BookUser, Settings, Printer
 } from 'lucide-react'
 
 const menusPorRol = {
@@ -14,6 +14,7 @@ const menusPorRol = {
     { path: '/pagos', label: 'Pagos', icon: DollarSign },
     { path: '/calendario', label: 'Calendario', icon: Calendar },
     { path: '/sanciones', label: 'Sanciones', icon: AlertTriangle },
+    { path: '/imprimir-carnets', label: 'Imprimir Carnets', icon: Printer },
     { path: '/actas', label: 'Actas', icon: FileText },
     { path: '/reportes', label: 'Reportes', icon: BarChart3 },
     { path: '/usuarios', label: 'Usuarios', icon: UserCog },
@@ -26,6 +27,7 @@ const menusPorRol = {
     { path: '/pagos', label: 'Pagos', icon: DollarSign },
     { path: '/calendario', label: 'Calendario', icon: Calendar },
     { path: '/sanciones', label: 'Sanciones', icon: AlertTriangle },
+    { path: '/imprimir-carnets', label: 'Imprimir Carnets', icon: Printer },
     { path: '/actas', label: 'Actas', icon: FileText },
     { path: '/reportes', label: 'Reportes', icon: BarChart3 },
     { path: '/configuracion', label: 'Configuración', icon: Settings },
