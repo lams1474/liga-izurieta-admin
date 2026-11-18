@@ -1,33 +1,77 @@
-// src/pages/ImprimirCarnets.jsx
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useReactToPrint } from 'react-to-print'
-import { Printer, Loader } from 'lucide-react'
+import { Printer, Loader, CheckSquare, Square } from 'lucide-react'
 import CarnetImprimible from '../components/CarnetImprimible'
 
 export default function ImprimirCarnets() {
+  const [equipos, setEquipos] = useState([])
+  const [equipoSeleccionado, setEquipoSeleccionado] = useState('')
   const [jugadores, setJugadores] = useState([])
+  const [seleccionados, setSeleccionados] = useState([])
   const [cargando, setCargando] = useState(true)
   const printRef = useRef(null)
 
+  // 1. Cargar lista de equipos
   useEffect(() => {
-    async function cargar() {
-      const { data, error } = await supabase
-        .from('vista_carnet_jugador')
-        .select('*')
-        .order('apellidos', { ascending: true })
-        .limit(10)
-      
-      if (data) setJugadores(data)
-      if (error) console.error(error)
+    async function cargarEquipos() {
+      const { data } = await supabase.from('equipos').select('id, nombre').eq('activo', true).order('nombre')
+      if (data) {
+        setEquipos(data)
+        if (data.length > 0) setEquipoSeleccionado(data[0].id)
+      }
       setCargando(false)
     }
-    cargar()
+    cargarEquipos()
   }, [])
+
+  // 2. Cargar jugadores del equipo seleccionado
+  useEffect(() => {
+    if (!equipoSeleccionado) return
+
+    async function cargarJugadores() {
+      setCargando(true)
+      const { data } = await supabase
+        .from('vista_carnet_jugador')
+        .select('*')
+        .eq('equipo_id', equipoSeleccionado) // Asegúrate de que esta columna exista en tu vista
+        .order('apellidos', { ascending: true })
+      
+      if (data) {
+        setJugadores(data)
+        setSeleccionados(data.map(j => j.jugador_id)) // Por defecto, todos seleccionados
+      } else {
+        setJugadores([])
+        setSeleccionados([])
+      }
+      setCargando(false)
+    }
+    cargarJugadores()
+  }, [equipoSeleccionado])
+
+  // 3. Manejar la selección de jugadores
+  const toggleSeleccion = (jugadorId) => {
+    setSeleccionados(prev => 
+      prev.includes(jugadorId) 
+        ? prev.filter(id => id !== jugadorId) 
+        : [...prev, jugadorId]
+    )
+  }
+
+  const toggleTodos = () => {
+    if (seleccionados.length === jugadores.length) {
+      setSeleccionados([])
+    } else {
+      setSeleccionados(jugadores.map(j => j.jugador_id))
+    }
+  }
+
+  // 4. Imprimir solo los seleccionados
+  const jugadoresAImprimir = jugadores.filter(j => seleccionados.includes(j.jugador_id))
 
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
-    documentTitle: 'Carnets Liga Izurieta',
+    documentTitle: `Carnets - ${equipos.find(e => e.id === equipoSeleccionado)?.nombre}`,
     copyStyles: true,
   })
 
@@ -35,41 +79,88 @@ export default function ImprimirCarnets() {
 
   return (
     <div className="max-w-5xl mx-auto p-4">
-      <div className="mb-6 flex justify-between items-center print:hidden">
-        <h1 className="text-2xl font-bold text-liga-azul">Imprimir Carnets</h1>
-        <button onClick={handlePrint} className="bg-liga-azul text-white px-4 py-2 rounded-md font-bold flex items-center gap-2 hover:bg-blue-800">
-          <Printer size={20} /> Imprimir Hoja A4
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
+        <div>
+          <h1 className="text-2xl font-bold text-liga-azul">Imprimir Carnets</h1>
+          <p className="text-gray-500 text-sm">Selecciona el club y los jugadores</p>
+        </div>
+        <button 
+          onClick={handlePrint} 
+          disabled={jugadoresAImprimir.length === 0}
+          className="bg-liga-azul text-white px-4 py-2 rounded-md font-bold flex items-center gap-2 hover:bg-blue-800 disabled:opacity-50"
+        >
+          <Printer size={20} /> Imprimir {jugadoresAImprimir.length} Carnets
         </button>
       </div>
 
-      {/* CONTENEDOR DE IMPRESIÓN */}
+      {/* Selector de Equipo y Lista de Jugadores */}
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6 print:hidden">
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Selecciona el Club</label>
+          <select
+            value={equipoSeleccionado}
+            onChange={(e) => setEquipoSeleccionado(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-liga-azul"
+          >
+            <option value="">Seleccione un club...</option>
+            {equipos.map(eq => (
+              <option key={eq.id} value={eq.id}>{eq.nombre}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-between items-center mb-2">
+          <p className="text-sm font-semibold text-gray-700">Jugadores ({jugadores.length})</p>
+          <button onClick={toggleTodos} className="text-xs text-liga-azul font-semibold underline">
+            {seleccionados.length === jugadores.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto border border-gray-200 p-2 rounded-md">
+          {jugadores.length === 0 ? (
+            <p className="text-sm text-gray-500 col-span-full">No hay jugadores registrados en este club.</p>
+          ) : (
+            jugadores.map(j => (
+              <button
+                key={j.jugador_id}
+                onClick={() => toggleSeleccion(j.jugador_id)}
+                className={`flex items-center gap-2 p-2 rounded-md border text-left text-sm transition-colors ${seleccionados.includes(j.jugador_id) ? 'bg-blue-50 border-liga-azul text-liga-azul font-bold' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}
+              >
+                {seleccionados.includes(j.jugador_id) ? <CheckSquare size={16} /> : <Square size={16} />}
+                <span className="truncate">{j.apellidos} {j.nombres}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* CONTENEDOR DE IMPRESIÓN (Oculto en pantalla) */}
       <div ref={printRef} className="hidden print:block">
         <style>
           {`
             @media print {
               @page { 
                 size: A4; 
-                margin: 5mm; /* Márgenes de la hoja */
+                margin: 5mm;
               }
               .print-container {
                 display: grid;
-                grid-template-columns: repeat(2, 1fr); /* 2 columnas */
-                grid-template-rows: repeat(5, 1fr);    /* 5 filas */
-                gap: 2mm; /* Espacio entre carnets */
+                grid-template-columns: repeat(2, 1fr);
+                gap: 2mm;
                 width: 100%;
                 height: 100%;
                 justify-items: center;
                 align-items: center;
               }
               .carnet-item {
-                page-break-inside: avoid; /* Evita que un carnet se corte */
+                page-break-inside: avoid;
               }
             }
           `}
         </style>
         
         <div className="print-container">
-          {jugadores.map((jugador) => (
+          {jugadoresAImprimir.map((jugador) => (
             <div key={jugador.jugador_id} className="carnet-item">
               <CarnetImprimible jugador={jugador} />
             </div>
