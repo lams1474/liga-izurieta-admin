@@ -12,6 +12,7 @@ export default function ImprimirCarnets() {
   const [cargando, setCargando] = useState(true)
   const printRef = useRef(null)
 
+  // 1. Cargar lista de equipos
   useEffect(() => {
     async function cargarEquipos() {
       const { data } = await supabase.from('equipos').select('id, nombre').eq('activo', true).order('nombre')
@@ -24,6 +25,7 @@ export default function ImprimirCarnets() {
     cargarEquipos()
   }, [])
 
+  // 2. Cargar jugadores del equipo seleccionado
   useEffect(() => {
     if (!equipoSeleccionado) return
 
@@ -47,6 +49,7 @@ export default function ImprimirCarnets() {
     cargarJugadores()
   }, [equipoSeleccionado])
 
+  // 3. Manejar la selección de jugadores
   const toggleSeleccion = (jugadorId) => {
     setSeleccionados(prev => 
       prev.includes(jugadorId) 
@@ -63,13 +66,13 @@ export default function ImprimirCarnets() {
     }
   }
 
+  // 4. Filtrar jugadores a imprimir
   const jugadoresAImprimir = jugadores.filter(j => seleccionados.includes(j.jugador_id))
 
-  // Hook de impresión con manejo de errores
+  // 5. Configurar impresión (SIN onBeforePrint para evitar el error .then)
   const handlePrint = useReactToPrint({
-    contentRef: printRef, // <-- En versiones nuevas de react-to-print se usa contentRef
-    documentTitle: `Carnets - ${equipos.find(e => e.id === equipoSeleccionado)?.nombre}`,
-    onBeforePrint: () => console.log("Preparando impresión..."),
+    contentRef: printRef,
+    documentTitle: `Carnets - ${equipos.find(e => e.id === equipoSeleccionado)?.nombre || 'Liga'}`,
     onAfterPrint: () => console.log("Impresión finalizada"),
     onPrintError: (error) => console.error("Error de impresión:", error),
   })
@@ -92,7 +95,7 @@ export default function ImprimirCarnets() {
         </button>
       </div>
 
-      {/* Selector de Equipo y Lista */}
+      {/* Selector de Equipo y Lista de Jugadores */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6 print:hidden">
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-700 mb-1">Selecciona el Club</label>
@@ -133,7 +136,7 @@ export default function ImprimirCarnets() {
         </div>
       </div>
 
-      {/* CONTENEDOR DE IMPRESIÓN: Lo movemos fuera de la pantalla en lugar de usar display:none */}
+      {/* CONTENEDOR DE IMPRESIÓN (Oculto fuera de pantalla para que react-to-print lo capture) */}
       <div style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
         <div ref={printRef}>
           <style>
