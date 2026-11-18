@@ -16,6 +16,7 @@ import MisJugadores from './pages/MisJugadores'
 import RegistroJugador from './pages/RegistroJugador'
 import MiClub from './pages/MiClub'
 import MiNomina from './pages/MiNomina'
+import ImprimirCarnets from './pages/ImprimirCarnets' // <--- NUEVA IMPORTACIÓN
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './contexts/AuthContext'
@@ -227,6 +228,18 @@ function App() {
           <ProtectedRoute rolesPermitidos={['delegado']}>
             <Layout>
               <MiNomina />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* NUEVA RUTA PARA IMPRIMIR CARNETS */}
+      <Route
+        path="/imprimir-carnets"
+        element={
+          <ProtectedRoute rolesPermitidos={['admin', 'secretaria']}>
+            <Layout>
+              <ImprimirCarnets />
             </Layout>
           </ProtectedRoute>
         }
