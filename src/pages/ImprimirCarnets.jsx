@@ -144,35 +144,32 @@ export default function ImprimirCarnets() {
               @media print {
                 @page { 
                   size: A4 portrait;
-                  margin: 0; /* Eliminamos márgenes de la página para que no reste espacio */
+                  margin: 5mm;
                 }
                 body {
-                  margin: 0;
-                  padding: 0;
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
+                  margin: 0;
+                  padding: 0;
                 }
                 .print-container {
                   display: grid;
                   grid-template-columns: repeat(2, 1fr);
                   gap: 2mm;
                   width: 100%;
-                  height: 100%;
-                  justify-items: center;
-                  align-items: center;
-                  padding: 5mm; /* Margen interno controlado */
+                  /* ESTO AGREGA ESPACIO ARRIBA EN CADA PÁGINA NUEVA */
+                  padding-top: 5mm; 
                 }
                 .carnet-item {
-                  page-break-inside: avoid;
                   width: 8.5cm !important;
                   height: 5.5cm !important;
-                  /* Forzar que el navegador no reduzca el tamaño */
-                  transform: scale(1) !important;
-                  transform-origin: top left;
+                  page-break-inside: avoid !important;
+                  break-inside: avoid !important;
                 }
-                .carnet-item > div {
-                  width: 8.5cm !important;
-                  height: 5.5cm !important;
+                /* Forzar el salto de página después de cada 10 carnets */
+                .carnet-item:nth-child(10n) {
+                  page-break-after: always !important;
+                  break-after: page !important;
                 }
               }
             `}
