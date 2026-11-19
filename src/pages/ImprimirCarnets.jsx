@@ -143,8 +143,14 @@ export default function ImprimirCarnets() {
             {`
               @media print {
                 @page { 
-                  size: A4; 
-                  margin: 5mm;
+                  size: A4 portrait;
+                  margin: 0; /* Eliminamos márgenes de la página para que no reste espacio */
+                }
+                body {
+                  margin: 0;
+                  padding: 0;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
                 }
                 .print-container {
                   display: grid;
@@ -154,9 +160,19 @@ export default function ImprimirCarnets() {
                   height: 100%;
                   justify-items: center;
                   align-items: center;
+                  padding: 5mm; /* Margen interno controlado */
                 }
                 .carnet-item {
                   page-break-inside: avoid;
+                  width: 8.5cm !important;
+                  height: 5.5cm !important;
+                  /* Forzar que el navegador no reduzca el tamaño */
+                  transform: scale(1) !important;
+                  transform-origin: top left;
+                }
+                .carnet-item > div {
+                  width: 8.5cm !important;
+                  height: 5.5cm !important;
                 }
               }
             `}
