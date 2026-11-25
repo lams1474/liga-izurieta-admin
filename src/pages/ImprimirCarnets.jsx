@@ -161,8 +161,8 @@ export default function ImprimirCarnets() {
                   padding-top: 5mm; 
                 }
                 .carnet-item {
-                  width: 8.5cm !important;
-                  height: 5.5cm !important;
+                  width: 9cm !important;
+                  height: 6cm !important;
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
                 }
