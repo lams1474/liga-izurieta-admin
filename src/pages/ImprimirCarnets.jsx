@@ -144,29 +144,36 @@ export default function ImprimirCarnets() {
               @media print {
                 @page { 
                   size: A4 portrait;
-                  margin: 5mm;
+                  margin: 0; /* Margen cero para aprovechar toda la hoja */
                 }
                 body {
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
                   margin: 0;
                   padding: 0;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
                 }
                 .print-container {
                   display: grid;
-                  grid-template-columns: repeat(2, 1fr);
-                  gap: 2mm;
+                  /* Forzamos exactamente 2 columnas */
+                  grid-template-columns: repeat(2, 8.5cm);
+                  /* Forzamos exactamente 5 filas */
+                  grid-template-rows: repeat(5, 5.5cm);
+                  /* Espacio mínimo entre carnets */
+                  gap: 1mm;
+                  /* Centramos la cuadrícula en la hoja */
+                  justify-content: center;
+                  align-content: center;
                   width: 100%;
-                  /* ESTO AGREGA ESPACIO ARRIBA EN CADA PÁGINA NUEVA */
-                  padding-top: 5mm; 
+                  height: 100%;
                 }
                 .carnet-item {
-                  width: 9cm !important;
-                  height: 6cm !important;
+                  width: 8.5cm !important;
+                  height: 5.5cm !important;
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
+                  margin: 0 !important;
                 }
-                /* Forzar el salto de página después de cada 10 carnets */
+                /* Forzar el salto de página después del carnet número 10 */
                 .carnet-item:nth-child(10n) {
                   page-break-after: always !important;
                   break-after: page !important;
