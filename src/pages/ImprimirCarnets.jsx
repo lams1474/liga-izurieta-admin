@@ -144,36 +144,29 @@ export default function ImprimirCarnets() {
               @media print {
                 @page { 
                   size: A4 portrait;
-                  margin: 0; /* Margen cero para aprovechar toda la hoja */
+                  margin: 5mm;
                 }
                 body {
-                  margin: 0;
-                  padding: 0;
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
+                  margin: 0;
+                  padding: 0;
                 }
                 .print-container {
                   display: grid;
-                  /* Forzamos exactamente 2 columnas */
-                  grid-template-columns: repeat(2, 8.5cm);
-                  /* Forzamos exactamente 5 filas */
-                  grid-template-rows: repeat(5, 5.5cm);
-                  /* Espacio mínimo entre carnets */
-                  gap: 1mm;
-                  /* Centramos la cuadrícula en la hoja */
-                  justify-content: center;
-                  align-content: center;
+                  grid-template-columns: repeat(2, 1fr);
+                  gap: 2mm;
                   width: 100%;
-                  height: 100%;
+                  /* ESTO AGREGA ESPACIO ARRIBA EN CADA PÁGINA NUEVA */
+                  padding-top: 5mm; 
                 }
                 .carnet-item {
-                  width: 8.5cm !important;
-                  height: 5.5cm !important;
+                  width: 9cm !important;
+                  height: 6cm !important;
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
-                  margin: 0 !important;
                 }
-                /* Forzar el salto de página después del carnet número 10 */
+                /* Forzar el salto de página después de cada 10 carnets */
                 .carnet-item:nth-child(10n) {
                   page-break-after: always !important;
                   break-after: page !important;
