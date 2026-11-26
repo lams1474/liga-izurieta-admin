@@ -142,31 +142,43 @@ export default function ImprimirCarnets() {
           <style>
             {`
               @media print {
+                /* 1. Definir márgenes de la hoja A4 */
                 @page { 
                   size: A4 portrait;
-                  margin: 5mm;
+                  margin: 10mm; /* Márgenes superior, inferior, izquierdo y derecho */
                 }
+                
                 body {
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
                   margin: 0;
                   padding: 0;
                 }
+                
                 .print-container {
                   display: grid;
-                  grid-template-columns: repeat(2, 1fr);
-                  gap: 2mm;
+                  /* 2. Forzar 2 columnas de 8.5cm cada una */
+                  grid-template-columns: repeat(2, 8.5cm);
+                  /* 3. Forzar 5 filas de 5.5cm cada una */
+                  grid-template-rows: repeat(5, 5.5cm);
+                  gap: 2mm; /* Espacio entre carnets */
                   width: 100%;
-                  /* ESTO AGREGA ESPACIO ARRIBA EN CADA PÁGINA NUEVA */
-                  padding-top: 5mm; 
+                  height: 100%;
+                  justify-content: center; /* Centrar horizontalmente */
+                  align-content: center;   /* Centrar verticalmente */
                 }
+                
                 .carnet-item {
-                  width: 9cm !important;
-                  height: 6cm !important;
+                  /* 4. Tamaño exacto de 8.5cm x 5.5cm */
+                  width: 8.5cm !important;
+                  height: 5.5cm !important;
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
+                  border: none !important;      /* Eliminar bordes que causan la línea vertical */
+                  box-shadow: none !important;  /* Eliminar sombras */
                 }
-                /* Forzar el salto de página después de cada 10 carnets */
+                
+                /* 5. Forzar el salto de página después de cada 10 carnets */
                 .carnet-item:nth-child(10n) {
                   page-break-after: always !important;
                   break-after: page !important;
