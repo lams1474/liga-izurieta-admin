@@ -166,6 +166,8 @@ export default function ImprimirCarnets() {
                   height: 100%;
                   justify-content: center; /* Centrar horizontalmente */
                   align-content: center;   /* Centrar verticalmente */
+                  border: none !important;      /* Elimina bordes */
+                  box-shadow: none !important;  /* Elimina sombras */
                 }
                 
                 .carnet-item {
