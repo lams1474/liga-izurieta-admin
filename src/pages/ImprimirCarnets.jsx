@@ -142,45 +142,41 @@ export default function ImprimirCarnets() {
           <style>
             {`
               @media print {
-                /* 1. Definir márgenes de la hoja A4 */
                 @page { 
                   size: A4 portrait;
-                  margin: 10mm; /* Márgenes superior, inferior, izquierdo y derecho */
+                  margin: 10mm;
                 }
-                
                 body {
                   -webkit-print-color-adjust: exact !important;
                   print-color-adjust: exact !important;
                   margin: 0;
                   padding: 0;
                 }
-                
                 .print-container {
                   display: grid;
-                  /* 2. Forzar 2 columnas de 8.5cm cada una */
                   grid-template-columns: repeat(2, 8.5cm);
-                  /* 3. Forzar 5 filas de 5.5cm cada una */
                   grid-template-rows: repeat(5, 5.5cm);
-                  gap: 2mm; /* Espacio entre carnets */
+                  gap: 2mm;
                   width: 100%;
                   height: 100%;
-                  justify-content: center; /* Centrar horizontalmente */
-                  align-content: center;   /* Centrar verticalmente */
-                  border: none !important;      /* Elimina bordes */
-                  box-shadow: none !important;  /* Elimina sombras */
+                  justify-content: center;
+                  align-content: center;
+                  /* ELIMINAR CUALQUIER BORDE O SOMBRA DEL CONTENEDOR */
+                  border: none !important;
+                  outline: none !important;
+                  box-shadow: none !important;
                 }
-                
                 .carnet-item {
-                  /* 4. Tamaño exacto de 8.5cm x 5.5cm */
                   width: 8.5cm !important;
                   height: 5.5cm !important;
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
-                  border: none !important;      /* Eliminar bordes que causan la línea vertical */
-                  box-shadow: none !important;  /* Eliminar sombras */
+                  /* ELIMINAR CUALQUIER BORDE O SOMBRA DEL ITEM */
+                  border: none !important;
+                  outline: none !important;
+                  box-shadow: none !important;
                 }
-                
-                /* 5. Forzar el salto de página después de cada 10 carnets */
+                /* Forzar el salto de página después de cada 10 carnets */
                 .carnet-item:nth-child(10n) {
                   page-break-after: always !important;
                   break-after: page !important;
