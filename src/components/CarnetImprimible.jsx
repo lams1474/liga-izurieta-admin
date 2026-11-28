@@ -10,7 +10,7 @@ export default function CarnetImprimible({ jugador }) {
 
   return (
     // Tamaño exacto: 8.5cm de ancho x 5.5cm de alto
-    <div className="relative bg-blue-900 overflow-hidden" style={{ width: '8.5cm', height: '5.5cm' }}>
+    <div className="relative bg-blue-900 overflow-hidden" style={{ width: '9cm', height: '6cm' }}>
       <img src={carnetFondo} alt="Fondo" className="absolute inset-0 w-full h-full object-cover z-0" />
       
       {/* Foto (escalada proporcionalmente) */}
