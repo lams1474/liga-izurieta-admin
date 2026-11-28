@@ -144,7 +144,7 @@ export default function ImprimirCarnets() {
               @media print {
                 @page { 
                   size: A4 portrait;
-                  margin: 5mm; /* Un margen pequeño de 5mm */
+                  margin: 5mm; /* Margen de 5mm en los bordes */
                 }
                 body {
                   -webkit-print-color-adjust: exact !important;
@@ -154,11 +154,11 @@ export default function ImprimirCarnets() {
                 }
                 .print-container {
                   display: grid;
-                  /* 2 columnas de 9cm (2 x 9 = 18cm, cabe en A4) */
+                  /* 2 columnas de 9cm */
                   grid-template-columns: repeat(2, 9cm);
-                  /* 5 filas de 6cm (5 x 6 = 30cm, justo en el límite de A4) */
-                  grid-template-rows: repeat(5, 6cm);
-                  gap: 0.5mm; /* Reducimos el espacio al mínimo para que quepan */
+                  /* 5 filas de 5.8cm (5 x 5.8 = 29cm, cabe en A4) */
+                  grid-template-rows: repeat(5, 5.8cm);
+                  gap: 0.5mm; /* Espacio mínimo entre carnets */
                   width: 100%;
                   height: 100%;
                   justify-content: center;
@@ -169,7 +169,7 @@ export default function ImprimirCarnets() {
                 }
                 .carnet-item {
                   width: 9cm !important;
-                  height: 6cm !important;
+                  height: 5.8cm !important;
                   page-break-inside: avoid !important;
                   break-inside: avoid !important;
                   border: none !important;

@@ -9,8 +9,8 @@ export default function CarnetImprimible({ jugador }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(urlVerificacion)}`
 
   return (
-    // Tamaño exacto: 8.5cm de ancho x 5.5cm de alto
-    <div className="relative bg-blue-900 overflow-hidden" style={{ width: '9cm', height: '6cm' }}>
+    // Tamaño exacto: 9cm de ancho x 5.8cm de alto
+    <div className="relative bg-blue-900 overflow-hidden" style={{ width: '9cm', height: '5.8cm' }}>
       <img src={carnetFondo} alt="Fondo" className="absolute inset-0 w-full h-full object-cover z-0" />
       
       {/* Foto (escalada proporcionalmente) */}
